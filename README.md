@@ -1,10 +1,19 @@
 # Fleetglass
 
-**See which AI agent is using your server, what it costs, and what changed around it.** Fleetglass is a self-hosted, read-only cockpit for Linux servers running Claude Code and Codex. It connects agent sessions and projects to processes, CPU, memory, quotas and incidents alongside full machine and service monitoring. Your data stays on your own server.
+**See which AI agent is using your server, what it costs, and what changed around it.** Fleetglass is a self-hosted, read-only cockpit for Linux servers running Claude Code and Codex. It connects agent sessions and projects to processes, CPU, memory, token usage and quotas alongside machine and service monitoring. Your data stays on your own server.
 
-![Fleetglass Overview with synthetic fixture data](assets/screenshots/overview-fixture.png)
+![Light-theme Overview showing three active AI agents, healthy services and one certificate to watch](assets/screenshots/overview-light.png)
 
-*Overview on a synthetic fixture host. All names and measurements in this image are test data.*
+*All screenshots below use synthetic data from the `demo-01` fixture. No real host or account data is shown.*
+
+<details>
+<summary>See the dark theme and mobile layout</summary>
+
+![Dark-theme Overview with the same synthetic host data](assets/screenshots/overview-dark.png)
+
+<img src="assets/screenshots/overview-mobile.png" width="390" alt="Mobile Overview showing agent activity, quotas and server health on the synthetic host">
+
+</details>
 
 ## One cockpit for the machine and its agents
 
@@ -14,9 +23,13 @@
 - **Availability across a fleet:** external and internal probes, 30-day history, a minimal public status page and per-host tokens for remote agents.
 - **A private, installable cockpit:** live SSE updates, English and French, light and dark themes, phone layout, offline shell, read-only Prometheus export and an optional read-only MCP endpoint. No action can restart or change your host.
 
-![Fleetglass Agents with synthetic fixture data](assets/screenshots/agents-fixture.png)
+![Agents view showing three synthetic Claude Code and Codex sessions](assets/screenshots/agents-light.png)
 
-*Agent view generated from synthetic visual-check fixtures; no production data is included.*
+![Apps view grouping synthetic containers and agent sessions by resource use](assets/screenshots/apps-light.png)
+
+![Projects view showing the synthetic atlas, orbit and ledger development servers](assets/screenshots/projects-light.png)
+
+**On the roadmap:** alert delivery and incident workflows, including acknowledgement, snooze and maintenance windows. The current cockpit shows observed issues; it does not send alerts.
 
 ## Quick start
 
