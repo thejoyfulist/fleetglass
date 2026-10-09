@@ -16,6 +16,7 @@ import {
   formatTokens,
   groupProcessSessions,
   mountName,
+  observationName,
   pace,
   quotaLabel,
   quotaMethod,
@@ -59,6 +60,19 @@ describe("formatting", () => {
     setLanguage("en");
     expect(formatMoney(12.68,"EUR")).toBe("€12.68");
     expect(formatConverted({original:12.68,currency:"EUR",converted:null,display_currency:"USD"})).toContain("rate unavailable");
+  });
+});
+describe("observation titles", () => {
+  it("uses display names and readable fallback titles in both languages", () => {
+    for (const language of ["en", "fr"] as const) {
+      setLanguage(language);
+      expect(observationName("internal:closed_target", "Database relay")).toBe("Database relay");
+      expect(observationName("internal:closed_target")).toBe(language === "en" ? "Closed target" : "Cible fermée");
+      expect(observationName("oom:0")).toBe(language === "en" ? "Out-of-memory kill" : "Arrêt par manque de mémoire");
+      expect(observationName("status:offsite_copy")).toBe(language === "en" ? "Offsite copy" : "Copie hors site");
+      expect(observationName("security:updates")).toBe("Security updates");
+    }
+    setLanguage("en");
   });
 });
 describe("stale observations and ended sessions", () => {

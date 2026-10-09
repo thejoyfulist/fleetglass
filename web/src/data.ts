@@ -429,6 +429,14 @@ export function mountName(name: string) {
   return mount === "/" ? t("observation.root") : mount;
 }
 export function observationName(name: string, displayName?: string) {
+  if (displayName?.trim()) return displayName.trim();
+  if (name.startsWith("oom:")) return t("observation.oom");
+  if (name === "internal:closed_target") return t("observation.closed_target");
+  if (name === "status:offsite_copy") return t("observation.offsite_copy");
+  if (/^(log_marker|internal|status):/.test(name)) {
+    const label = name.split(":").slice(1).join(" ").replaceAll("_", " ").trim();
+    return label ? label.charAt(0).toUpperCase() + label.slice(1) : t("observation.check");
+  }
   if (name.startsWith("disk:")) return mountName(name);
   if (name === "cpu_package_power") return t("observation.cpu_package");
   if (name === "cpu") return t("observation.cpu");
@@ -439,8 +447,8 @@ export function observationName(name: string, displayName?: string) {
   if (name.startsWith("network:")) return t("observation.network", {name: name.slice(8)});
   if (name.startsWith("tls:")) return t("observation.certificate", {name: name.slice(4)});
   if (name === "recent_errors") return t("ui.recent.errors.b0f52");
-  if (/^(log_marker|internal|status):/.test(name)) return displayName || name.split(":").slice(1).join(":").replaceAll("_", " ");
-  return name;
+  const label = name.replaceAll(":", " ").replaceAll("_", " ").trim();
+  return label ? label.charAt(0).toUpperCase() + label.slice(1) : t("observation.check");
 }
 export function formatMoney(n: number | null, currency = "USD"): string {
   return n === null ? unknown() : new Intl.NumberFormat(activeLanguage() === "fr" ? "fr-FR" : "en-US", {

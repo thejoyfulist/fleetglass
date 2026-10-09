@@ -858,7 +858,7 @@ function StatusFiles({results}:{results:Result[]}) {
   const probes=matching(results,"internal:");
   const markers=matching(results,"log_marker:");
   return <Tile title={t("ui.status.files.and.internal.probes.46db9")} source={t("ui.configured.checks.79704")} className="half">
-    <List items={[...files,...markers,...probes].map(x => ({name:x.fields?.display_name || x.name.split(":").slice(1).join(":").replaceAll("_", " "),detail:resultDetail(x),end:x.state==="crit"?t("system.down"):x.name.startsWith("status:") || x.name.startsWith("log_marker:") ? formatDuration(value(x,"age_seconds")) : value(x,"latency_ms") !== null ? `${formatNumber(value(x,"latency_ms") || 0)} ms${value(x,"status_code") ? ` · HTTP ${value(x,"status_code")}` : ""}` : "",state:x.state}))} />
+    <List items={[...files,...markers,...probes].map(x => ({name:observationName(x.name,x.fields?.display_name),detail:resultDetail(x),end:x.state==="crit"?t("system.down"):x.name.startsWith("status:") || x.name.startsWith("log_marker:") ? formatDuration(value(x,"age_seconds")) : value(x,"latency_ms") !== null ? `${formatNumber(value(x,"latency_ms") || 0)} ms${value(x,"status_code") ? ` · HTTP ${value(x,"status_code")}` : ""}` : "",state:x.state}))} />
   </Tile>;
 }
 function Repositories({results}:{results:Result[]}) {

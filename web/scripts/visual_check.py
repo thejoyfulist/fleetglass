@@ -17,6 +17,7 @@ from playwright.sync_api import sync_playwright
 
 DIST = Path(__file__).resolve().parents[1] / "dist"
 SHOTS = Path(os.environ.get('FLEETGLASS_SCREENSHOTS_DIR', tempfile.mkdtemp(prefix='fleetglass-screenshots-')))
+HOST_ID = "demo-host"
 NOW = datetime.now(timezone.utc)
 def iso(delta=0):
     return (NOW + timedelta(seconds=delta)).isoformat().replace("+00:00", "Z")
@@ -51,6 +52,8 @@ RESULTS = [
     result("status:offsite_copy", {"age_seconds":3600}, detail="recent timestamp") | {"detail_code":"recent_timestamp"},
     result("log_marker:backup_verified", {"count":4,"age_seconds":7200}, detail="matching log entry observed") | {"detail_code":"log_entry_observed"},
     result("internal:db_relay", {"latency_ms":21}, detail="TCP connect succeeded") | {"detail_code":"tcp_connect_succeeded"},
+    result("internal:closed_target", state="warn", detail="Connection refused"),
+    result("oom:0", {"count":1}, state="warn", detail="Kernel out-of-memory kill"),
     {**result("repository:0:fleetglass", {"dirty":1,"ahead":2,"behind":0,"last_commit_age_seconds":3600,"has_upstream":1}, state="warn"), "fields":{"repository":"fleetglass"}},
 ]
 AGENTS = [
@@ -75,6 +78,7 @@ SPEED = [{"kind":"codex","model":"gpt-6-sol","method":"estimated","window":"1h",
 SESSION_SPEED = [{"kind":"claude","model":"Claude Sonnet","method":"estimated","window":"1h","live_tokens_per_second":12.5,"median_tokens_per_second":11.8,"p95_tokens_per_second":15.1,"median_duration_ms":None,"median_first_token_ms":None,"tokens_per_minute":700,"requests_per_minute":0.6,"api_errors":0,"retries":0}]
 SUBSCRIPTIONS = [{"kind":"claude","month":"2026-10","api_equivalent_usd":8.47,"subscription_usd":None,"coverage":"partial","unpriced_tokens":970000},{"kind":"codex","month":"2026-10","api_equivalent_usd":4.21,"subscription_usd":None,"coverage":"complete","unpriced_tokens":0}]
 WORKTREES = {"worktrees":[{"root":"/tmp/workspaces","project":"fleetglass","name":"fleetglass-m9d","path":"/tmp/workspaces/fleetglass/fleetglass-m9d","size_bytes":125829120,"size_complete":True,"created_at":iso(-172800),"last_commit_at":iso(-3600),"merged":False,"agent_processes":1,"processes":1,"stale":False,"reclaimable":False}],"reclaimable_bytes":0,"at":iso()}
+APPS = [{"name":"demo-worker","kind":"unit","rates_ready":True,"cpu_percent":120,"memory_bytes":268435456,"page_cache_bytes":0,"disk_read_bytes_per_second":0,"disk_write_bytes_per_second":0,"disk_read_bytes":0,"disk_write_bytes":0}]
 CHANGES = [
     {"id":"a"*64,"at":iso(-3600),"type":"APT","text":"Upgraded 3 packages: curl, openssl, git","change_code":"apt_upgraded","change_params":{"count":"3","packages":"curl, openssl, git"}},
     {"id":"b"*64,"at":iso(-7200),"type":"Service","text":"caddy.service restarted","change_code":"service_restarted","change_params":{"name":"caddy.service"}},
@@ -87,6 +91,8 @@ def probe_days(degraded=False):
              "state":"unknown" if i < 28 else "warn" if degraded and i == 28 else "ok",
              "uptime":None if i < 28 else 95 if degraded and i == 28 else 100,
              "coverage":0 if i < 28 else 0.4 if i == 29 else 1} for i in range(30)]
+PROBES = [{"name":"site","display_name":"Example site","kind":"http","state":"ok","uptime_24h":100,"uptime_7d":100,"uptime_30d":100,"coverage_24h":0.12,"coverage_7d":0.02,"coverage_30d":0.004,"days":probe_days(),"p50_ms":120,"p95_ms":170,"percentiles":{"24h":{"p50_ms":120,"p95_ms":170},"7d":{"p50_ms":120,"p95_ms":170},"30d":{"p50_ms":120,"p95_ms":170}},"status_code":200,"latency_ms":121,"dns_ms":2,"connect_ms":8,"tls_ms":20,"first_byte_ms":90,"certificate_days":54,"points":[{"at":iso(-3600*(23-i)),"latency_ms":110+i*2,"state":"crit" if i==18 else "ok"} for i in range(24)]}]
+SERIES_BASES = {"busy_percent":5,"watts":6,"used_bytes":470*1024**3,"celsius":42,"rx_bytes_per_second":2048,"tx_bytes_per_second":512,"cost":1.5}
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(DIST), **kwargs)
@@ -104,10 +110,11 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body); return
 
             if path == "/api/v1/auth": data = {"required":False}
-            elif path == "/api/v1/hosts": data = [{"host_id":"demo-host","at":iso()}]
-            elif path.endswith("/overview"): data = {"host_id":"demo-host","at":iso(),"results":RESULTS,"agents":AGENTS}
+            elif path == "/api/v1/version": data = {"version":"v0.3.0-demo","latest":"","update_check_enabled":False}
+            elif path == "/api/v1/hosts": data = [{"host_id":HOST_ID,"at":iso()}]
+            elif path.endswith("/overview"): data = {"host_id":HOST_ID,"at":iso(),"results":RESULTS,"agents":AGENTS}
             elif path.endswith("/agents"): data = AGENTS
-            elif path.endswith("/apps"): data = {"apps":[{"name":"demo-worker","kind":"unit","rates_ready":True,"cpu_percent":120,"memory_bytes":268435456,"page_cache_bytes":0,"disk_read_bytes_per_second":0,"disk_write_bytes_per_second":0,"disk_read_bytes":0,"disk_write_bytes":0}],"history":[],"top_hours":[],"range":"24h"}
+            elif path.endswith("/apps"): data = {"apps":APPS,"history":[],"top_hours":[],"range":"24h"}
             elif path.endswith("/ai/quotas"): data = QUOTAS
             elif path.endswith("/ai/costs"): data = COSTS
             elif path.endswith("/ai/speed"): data = SPEED
@@ -117,15 +124,15 @@ class Handler(SimpleHTTPRequestHandler):
             elif path.endswith("/changes"): data = CHANGES
             elif path.endswith("/energy"): data = ENERGY
             elif path.endswith("/observations"): data = OBSERVATIONS
-            elif path.endswith("/probes"): data = [{"name":"site","display_name":"Example site","kind":"http","state":"ok","uptime_24h":100,"uptime_7d":100,"uptime_30d":100,"coverage_24h":0.12,"coverage_7d":0.02,"coverage_30d":0.004,"days":probe_days(),"p50_ms":120,"p95_ms":170,"percentiles":{"24h":{"p50_ms":120,"p95_ms":170},"7d":{"p50_ms":120,"p95_ms":170},"30d":{"p50_ms":120,"p95_ms":170}},"status_code":200,"latency_ms":121,"dns_ms":2,"connect_ms":8,"tls_ms":20,"first_byte_ms":90,"certificate_days":54,"points":[{"at":iso(-3600*(23-i)),"latency_ms":110+i*2,"state":"crit" if i==18 else "ok"} for i in range(24)]}]
+            elif path.endswith("/probes"): data = PROBES
             elif path.endswith("/ai/usage"):
                 by = q.get("by", ["project"])[0]
-                if by == "session": data = [{**USAGE[0],"name":"session-1"},{**USAGE[1],"name":"session-2"}]
+                if by == "session": data = [{**usage,"name":agent["id"]} for usage,agent in zip(USAGE,AGENTS)]
                 elif by == "model": data = [{**USAGE[0],"name":"Claude Sonnet"},{**USAGE[1],"name":"Codex"}]
                 else: data = USAGE
             elif path.endswith("/series") or path.endswith("/ai/cost-series"):
                 metric = q.get("metric", ["cost"])[0]
-                base = {"busy_percent":5,"watts":6,"used_bytes":470*1024**3,"celsius":42,"rx_bytes_per_second":2048,"tx_bytes_per_second":512,"cost":1.5}.get(metric, 5)
+                base = SERIES_BASES.get(metric, 5)
                 data = [{"at":iso(-3600*(23-i)),"value":base*(0.8+0.15*math.sin(i/3)+0.01*i)} for i in range(24)]
             else: data = []
             body = json.dumps(data).encode()
@@ -221,6 +228,10 @@ def main():
                         if failures: errors.append(f"{view}-{theme}-{width}: " + "; ".join(failures[:12]))
                         if re.search(r"\b\d{1,2}/\d{1,2}/\d{4}\b", page.locator("body").inner_text()):
                             errors.append(f"{view}-{theme}-{width}: numeric date visible")
+                        body = page.locator("body").inner_text()
+                        observed_names = {"sample_service"}
+                        technical = [word for word in re.findall(r"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b|\b[a-z][a-z0-9_]*:[a-z0-9_./-]+\b", body) if word not in observed_names]
+                        if technical: errors.append(f"{view}-{theme}-{width}: technical identifiers visible {sorted(set(technical))}")
                         if view == "storage" and not re.search(r"\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2}, \d{2}:\d{2}\b", page.locator(".observation-storage .src").inner_text()):
                             errors.append(f"storage-{theme}-{width}: scan date format")
                         if view=="system" and width in (1440,390):
