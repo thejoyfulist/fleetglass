@@ -1,0 +1,17 @@
+[Unit]
+Description=Fleetglass privileged read helper
+After=local-fs.target
+
+[Service]
+User=root
+Group=root
+RuntimeDirectory=fleetglass
+RuntimeDirectoryMode=0755
+ExecStart=/usr/local/bin/fleetglass-helper -config /etc/fleetglass/config.json -group fleetglass
+Restart=on-failure
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

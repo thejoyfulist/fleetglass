@@ -1,0 +1,18 @@
+[Unit]
+Description=Fleetglass server
+After=network.target
+
+[Service]
+User=fleetglass
+Group=fleetglass
+UMask=0077
+ExecStart=/usr/local/bin/fleetglass-server -config /etc/fleetglass/config.json
+WorkingDirectory=/var/lib/fleetglass
+Restart=on-failure
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/fleetglass
+
+[Install]
+WantedBy=multi-user.target

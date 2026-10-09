@@ -1,0 +1,15 @@
+[Unit]
+Description=Fleetglass agent
+After=network.target
+
+[Service]
+User=fleetglass
+Group=fleetglass
+ExecStart=/usr/local/bin/fleetglass-agent -config /etc/fleetglass/config.json
+Restart=on-failure
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+{"timestamp":"TIMESTAMP","type":"session_meta","payload":{"id":"redacted-session","cwd":"/srv/projects/example","model_provider":"openai"}}
+{"timestamp":"TIMESTAMP","type":"turn_context","payload":{"model":"gpt-6-sol","cwd":"/srv/projects/example"}}
+{"timestamp":"TIMESTAMP","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":20}}}}
+{"timestamp":"TIMESTAMP","type":"event_msg","payload":{"type":"turn_complete"}}

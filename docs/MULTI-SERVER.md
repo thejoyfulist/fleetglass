@@ -1,0 +1,5 @@
+# Multiple servers
+
+Install agent and helper on each Linux host. Keep a central server behind a TLS endpoint reachable by those agents. On the central server, enroll each host with `fleetglass-server -config /etc/fleetglass/config.json host add HOSTNAME`; redirect the one-time printed token into a private file. Give the remote agent a unique `host_id`, that `token_file`, and an HTTPS `server_url`; set `ca_file` for a private CA. The agent rejects remote plain HTTP and verifies TLS certificates. Do not copy the central ingest token or database to other hosts.
+
+The remote helper socket and OTLP listener stay local to the remote host. The agent buffers about ten minutes of batches when the server is unreachable and flushes in order. A host becomes silent after 45 seconds and offline after 24 hours. `host list`, `host revoke HOSTNAME` and `host remove HOSTNAME [--purge]` manage enrollment; `--purge` irreversibly removes stored host data. Fleet and host views share the same read API authorization. See [safe exposure](EXPOSURE.md) for the cockpit and [configuration](CONFIGURATION.md) for labels.

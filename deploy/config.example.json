@@ -1,0 +1,78 @@
+{
+  "host_id": "my-server",
+  "labels": {
+    "role": "agent-host"
+  },
+  "server_url": "http://127.0.0.1:7878",
+  "listen": "127.0.0.1:7878",
+  "token_file": "/etc/fleetglass/token",
+  "ca_file": "",
+  "buffer_dir": "/var/lib/fleetglass/buffer",
+  "read_token_file": "",
+  "mcp_listen": "",
+  "mcp_token_file": "",
+  "display_defaults": {"language":"en", "temperature":"C", "network":"bytes", "cpu":"core"},
+  "live_max_subscribers": 32,
+  "proc_root": "/proc",
+  "sys_root": "/sys",
+  "systemd_units": [
+    "ssh.service"
+  ],
+  "docker_sockets": [
+    "/var/run/docker.sock"
+  ],
+  "tls_domains": [],
+  "smart_devices": [],
+  "helper_socket": "/run/fleetglass/helper.sock",
+  "db_path": "fleetglass.db",
+  "otlp_listen": "127.0.0.1:4318",
+  "otlp_token": "",
+  "ai_log_roots": [],
+  "agent_commands": [
+    "claude",
+    "codex"
+  ],
+  "worktree_roots": [
+    "/srv/workspaces"
+  ],
+  "project_roots": [
+    "/srv/projects"
+  ],
+  "storage_roots": [
+    "/",
+    "/home",
+    "/var"
+  ],
+  "backup_sets": [],
+  "status_files": [],
+  "log_markers": [],
+  "repository_roots": [],
+  "local_only_repositories": [],
+  "excluded_repositories": [],
+  "internal_probes": [],
+  "http_probes": [
+    {
+      "name": "example_site",
+      "display_name": "Example site",
+      "url": "https://example.com/",
+      "method": "GET",
+      "expected_status": [200],
+      "body_keyword": "",
+      "timeout_ms": 5000,
+      "interval_seconds": 60,
+      "follow_redirects": false,
+      "public": false
+    }
+  ],
+  "status_listen": "",
+  "apt_history_path": "/var/log/apt",
+  "energy_price_per_kwh": 0.2516,
+  "energy_currency": "EUR",
+  "ai_prices": {},
+  "ai_subscriptions": [],
+  "claude_budget_5h": 0,
+  "claude_budget_week": 0,
+  "backup_dir": "",
+  "backup_retention_days": 0,
+  "update_check_url": ""
+}

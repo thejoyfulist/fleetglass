@@ -1,0 +1,23 @@
+{
+  "name": "fleetglass-web",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "check-build": "npm run build && git diff --exit-code HEAD -- dist && test -z \"$(git ls-files --others --exclude-standard -- dist)\""
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12",
+    "vitest": "^5.0.3"
+  }
+}

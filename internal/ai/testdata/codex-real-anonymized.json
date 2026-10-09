@@ -1,0 +1,113 @@
+[
+  {
+    "event_name": "event model-provider/src/models_endpoint.rs:308",
+    "attributes": {
+      "event.name": "codex.api_request",
+      "duration_ms": "336",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "prompt": "private prompt",
+      "unknown.field": "private unknown"
+    }
+  },
+  {
+    "event_name": "event otel/src/events/session_telemetry.rs:593",
+    "attributes": {
+      "event.name": "codex.conversation_starts",
+      "conversation.id": "fixture-session",
+      "model": "gpt-6-astra",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "prompt": "private prompt",
+      "unknown.field": "private unknown"
+    }
+  },
+  {
+    "event_name": "event otel/src/events/session_telemetry.rs:1082",
+    "attributes": {
+      "event.name": "codex.user_prompt",
+      "conversation.id": "fixture-session",
+      "model": "gpt-6-astra",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "prompt": "private prompt",
+      "unknown.field": "private unknown"
+    }
+  },
+  {
+    "event_name": "event otel/src/events/session_telemetry.rs:795",
+    "attributes": {
+      "event.name": "codex.websocket_request",
+      "duration_ms": "3",
+      "conversation.id": "fixture-session",
+      "model": "gpt-6-astra",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "prompt": "private prompt",
+      "unknown.field": "private unknown"
+    }
+  },
+  {
+    "event_name": "event otel/src/events/session_telemetry.rs:1035",
+    "attributes": {
+      "event.name": "codex.sse_event",
+      "event.kind": "response.completed",
+      "input_token_count": "12367",
+      "output_token_count": "0",
+      "cached_token_count": "0",
+      "cache_write_token_count": "0",
+      "reasoning_token_count": "0",
+      "conversation.id": "fixture-session",
+      "model": "gpt-6-astra",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "prompt": "private prompt",
+      "unknown.field": "private unknown"
+    }
+  },
+  {
+    "event_name": "event otel/src/events/session_telemetry.rs:795",
+    "attributes": {
+      "event.name": "codex.websocket_request",
+      "duration_ms": "0",
+      "conversation.id": "fixture-session",
+      "model": "gpt-6-astra",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "prompt": "private prompt",
+      "unknown.field": "private unknown"
+    }
+  },
+  {
+    "event_name": "event otel/src/events/session_telemetry.rs:289",
+    "attributes": {
+      "event.name": "codex.turn_ttft",
+      "duration_ms": "3387",
+      "conversation.id": "fixture-session",
+      "model": "gpt-6-astra",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "prompt": "private prompt",
+      "unknown.field": "private unknown"
+    }
+  },
+  {
+    "event_name": "event otel/src/events/session_telemetry.rs:1035",
+    "attributes": {
+      "event.name": "codex.sse_event",
+      "event.kind": "response.completed",
+      "input_token_count": "17231",
+      "output_token_count": "5",
+      "cached_token_count": "12160",
+      "cache_write_token_count": "0",
+      "reasoning_token_count": "0",
+      "ttft_ms": "1635",
+      "conversation.id": "fixture-session",
+      "model": "gpt-6-astra",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "prompt": "private prompt",
+      "unknown.field": "private unknown"
+    }
+  }
+]

@@ -1,0 +1,310 @@
+package store
+
+import (
+	"math"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/thejoyfulist/fleetglass/internal/model"
+)
+
+func TestAIDedupAndRetention(t *testing.T) {
+	s, e := Open(filepath.Join(t.TempDir(), "x.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	id := strings.Repeat("a", 64)
+	usageID := strings.Repeat("b", 64)
+	now := time.Now().UTC()
+	old := now.Add(-8 * 24 * time.Hour)
+	logBatch := model.Batch{HostID: "host", At: old, AI: &model.AI{Sessions: []model.AgentSession{{ID: id, Kind: "claude", At: old, Source: "log"}}, Usage: []model.AIUsage{{ID: usageID, Session: id, Kind: "claude", Model: "claude-sonnet-5", Project: "demo", At: old, Source: "log", Tokens: model.Tokens{Input: 10}}}}}
+	if e = s.Ingest(logBatch); e != nil {
+		t.Fatal(e)
+	}
+	otlpBatch := model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{{ID: id, Kind: "claude", At: now, Source: "otlp"}}, Usage: []model.AIUsage{{ID: strings.Repeat("c", 64), Session: id, Kind: "claude", Model: "claude-sonnet-5", Project: "demo", At: now, Source: "otlp", Tokens: model.Tokens{Input: 20}}}}}
+	if e = s.Ingest(otlpBatch); e != nil {
+		t.Fatal(e)
+	}
+	var n int
+	s.DB.QueryRow(`SELECT COUNT(*) FROM ai_usage`).Scan(&n)
+	if n != 1 {
+		t.Fatalf("dedup count=%d", n)
+	}
+	if e = s.Maintain(now); e != nil {
+		t.Fatal(e)
+	}
+	costs, e := s.Costs("host", "24h", nil, nil)
+	if e != nil || len(costs) == 0 {
+		t.Fatalf("costs %v %v", costs, e)
+	}
+}
+
+func TestProcessSessionSnapshot(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "process.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	process := model.AgentSession{ID: strings.Repeat("a", 64), Kind: "codex", Source: "process", PID: 42, At: now.Add(-48 * time.Hour), State: "running"}
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{process}}}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Agents("host")
+	if err != nil || len(got) != 1 || got[0].Source != "process" {
+		t.Fatalf("process session: %+v, %v", got, err)
+	}
+	logSession := model.AgentSession{ID: strings.Repeat("b", 64), Kind: "codex", Source: "log", PID: 42, At: now, State: "working"}
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{logSession}}}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = s.Agents("host")
+	if err != nil || len(got) != 1 || got[0].Source != "log" {
+		t.Fatalf("stale process session: %+v, %v", got, err)
+	}
+}
+
+func TestEndedSessionLeavesAgentsAfterOneDay(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "ended.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	for i, age := range []time.Duration{time.Hour, 25 * time.Hour} {
+		at := now.Add(-age)
+		id := strings.Repeat(string(rune('a'+i)), 64)
+		session := model.AgentSession{ID: id, Kind: "claude", At: at, State: "ended", Source: "log"}
+		if err := s.Ingest(model.Batch{HostID: "host", At: at, AI: &model.AI{Sessions: []model.AgentSession{session}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	agents, err := s.Agents("host")
+	if err != nil || len(agents) != 1 || agents[0].State != "ended" {
+		t.Fatalf("visible sessions: %+v, %v", agents, err)
+	}
+}
+
+func TestUnreportedSessionEndsAsTimePasses(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "aging.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	at := now.Add(-29 * time.Minute)
+	session := model.AgentSession{ID: strings.Repeat("a", 64), Kind: "claude", At: at, State: "unknown", Reason: "no recent activity", Source: "log"}
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{session}}}); err != nil {
+		t.Fatal(err)
+	}
+	before, err := s.agentsAt("host", now)
+	if err != nil || len(before) != 1 || before[0].State != "unknown" {
+		t.Fatalf("before threshold: %+v, %v", before, err)
+	}
+	after, err := s.agentsAt("host", now.Add(2*time.Minute))
+	if err != nil || len(after) != 1 || after[0].State != "ended" || after[0].Reason != "no process matched; no activity for over 30 minutes" {
+		t.Fatalf("after threshold without another report: %+v, %v", after, err)
+	}
+	var persisted string
+	if err := s.DB.QueryRow(`SELECT data FROM ai_sessions WHERE host_id='host'`).Scan(&persisted); err != nil || !strings.Contains(persisted, `"state":"unknown"`) {
+		t.Fatalf("read changed stored history: %v, %s", err, persisted)
+	}
+}
+
+func TestStaleWorktreeIsNotAnEndedSession(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "worktree.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	worktree := model.AgentSession{ID: strings.Repeat("a", 64), Kind: "unknown", At: now.Add(-time.Hour), State: "stale-worktree", Source: "worktree"}
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{worktree}}}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.agentsAt("host", now)
+	if err != nil || len(got) != 1 || got[0].State != "stale-worktree" {
+		t.Fatalf("worktree state: %+v, %v", got, err)
+	}
+}
+
+func TestAIHourlyRetention(t *testing.T) {
+	s, e := Open(filepath.Join(t.TempDir(), "x.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	at := now.Add(-8 * 24 * time.Hour)
+	id := strings.Repeat("a", 64)
+	b := model.Batch{HostID: "host", At: at, AI: &model.AI{Usage: []model.AIUsage{{ID: strings.Repeat("b", 64), Session: id, Kind: "claude", Project: "demo", At: at, Source: "log", Tokens: model.Tokens{Input: 13}}}}}
+	if e = s.Ingest(b); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.Maintain(now); e != nil {
+		t.Fatal(e)
+	}
+	var raw, agg int
+	s.DB.QueryRow(`SELECT COUNT(*) FROM ai_usage`).Scan(&raw)
+	s.DB.QueryRow(`SELECT COUNT(*) FROM ai_usage_hourly`).Scan(&agg)
+	if raw != 0 || agg != 1 {
+		t.Fatalf("raw=%d agg=%d", raw, agg)
+	}
+	rows, e := s.Usage("host", "30d", "project")
+	if e != nil || len(rows) != 1 {
+		t.Fatalf("usage=%v err=%v", rows, e)
+	}
+}
+
+func TestCostMethods(t *testing.T) {
+	s, e := Open(filepath.Join(t.TempDir(), "cost.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	session := strings.Repeat("a", 64)
+	u := model.AIUsage{ID: strings.Repeat("b", 64), Session: session, Kind: "claude", Model: "claude-sonnet-5", Project: "demo", At: now, Source: "otlp", Tokens: model.Tokens{Input: 1000000}, CostUSD: 2, Method: "cli_reported"}
+	if e = s.Ingest(model.Batch{HostID: "h", At: now, AI: &model.AI{Usage: []model.AIUsage{u}}}); e != nil {
+		t.Fatal(e)
+	}
+	rows, e := s.Costs("h", "30d", nil, []model.AISubscription{{Kind: "claude", MonthlyUSD: 30}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	seen := map[string]bool{}
+	for _, r := range rows {
+		seen[r["method"].(string)] = true
+		if r["method"] == "api_equivalent" && (r["usd"] != float64(2) || r["partial"] != false || r["unpriced_tokens"] != int64(0) || len(r["unpriced_models"].([]string)) != 0) {
+			t.Fatalf("priced cost coverage: %+v", r)
+		}
+	}
+	for _, method := range []string{"cli_reported", "api_equivalent", "subscription_allocated"} {
+		if !seen[method] {
+			t.Fatalf("missing %s: %+v", method, rows)
+		}
+	}
+}
+
+func TestCostPricingCoverageAndModelMatching(t *testing.T) {
+	s, e := Open(filepath.Join(t.TempDir(), "coverage.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	session := strings.Repeat("a", 64)
+	usage := []model.AIUsage{
+		{ID: strings.Repeat("b", 64), Session: session, Kind: "claude", Project: "mixed", Model: "claude-opus-5-5-20261001", At: now, Source: "otlp", Tokens: model.Tokens{Input: 1_000_000}},
+		{ID: strings.Repeat("c", 64), Session: session, Kind: "claude", Project: "mixed", Model: "claude-opus-5-5x", At: now, Source: "otlp", Tokens: model.Tokens{Output: 20}},
+		{ID: strings.Repeat("d", 64), Session: session, Kind: "claude", Project: "mixed", Model: "unknown-b", At: now, Source: "otlp", Tokens: model.Tokens{Input: 3, CacheRead: 4}},
+		{ID: strings.Repeat("e", 64), Session: session, Kind: "claude", Project: "other", Model: "unknown-a", At: now, Source: "otlp", Tokens: model.Tokens{Output: 6}},
+		{ID: strings.Repeat("f", 64), Session: session, Kind: "claude", Project: "mixed", Model: "<synthetic>", At: now, Source: "otlp", Tokens: model.Tokens{Input: 100}},
+	}
+	if e := s.Ingest(model.Batch{HostID: "h", At: now, AI: &model.AI{Usage: usage}}); e != nil {
+		t.Fatal(e)
+	}
+	rows, e := s.Costs("h", "24h", nil, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("unexpected rows: %+v", rows)
+	}
+	for _, row := range rows {
+		if row["method"] != "api_equivalent" || row["partial"] != true {
+			t.Fatalf("missing partial coverage: %+v", row)
+		}
+		switch row["project"] {
+		case "mixed":
+			if math.Abs(row["usd"].(float64)-4) > 1e-9 || row["unpriced_tokens"] != int64(27) || strings.Join(row["unpriced_models"].([]string), ",") != "claude-opus-5-5x,unknown-b" {
+				t.Fatalf("mixed: %+v", row)
+			}
+		case "other":
+			if row["usd"] != float64(0) || row["unpriced_tokens"] != int64(6) || strings.Join(row["unpriced_models"].([]string), ",") != "unknown-a" {
+				t.Fatalf("other: %+v", row)
+			}
+		default:
+			t.Fatalf("unknown project: %+v", row)
+		}
+	}
+	price, ok := modelPrice(effectivePrices(nil), "claude-sonnet-5-20261001")
+	if !ok || price.Input != 2 {
+		t.Fatalf("dated Sonnet price: %+v, %v", price, ok)
+	}
+	price, ok = modelPrice(effectivePrices(map[string]model.AIPrice{"claude-opus-5-5-20261001": {Input: 7}}), "claude-opus-5-5-20261001")
+	if !ok || price.Input != 7 {
+		t.Fatalf("exact override: %+v, %v", price, ok)
+	}
+}
+
+func TestAIDailyRetention(t *testing.T) {
+	s, e := Open(filepath.Join(t.TempDir(), "daily.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	at := now.Add(-100 * 24 * time.Hour)
+	id := strings.Repeat("a", 64)
+	if e = s.Ingest(model.Batch{HostID: "h", At: at, AI: &model.AI{Usage: []model.AIUsage{{ID: strings.Repeat("b", 64), Session: id, Kind: "claude", At: at, Source: "log", Tokens: model.Tokens{Output: 3}}}}}); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.Maintain(now); e != nil {
+		t.Fatal(e)
+	}
+	var daily int
+	s.DB.QueryRow(`SELECT COUNT(*) FROM ai_usage_daily`).Scan(&daily)
+	if daily != 1 {
+		t.Fatalf("daily=%d", daily)
+	}
+}
+
+func TestQuotaRetention(t *testing.T) {
+	s, e := Open(filepath.Join(t.TempDir(), "quotas.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	for i, age := range []time.Duration{8 * 24 * time.Hour, 100 * 24 * time.Hour} {
+		at := now.Add(-age)
+		q := model.Quota{Kind: "codex", Window: "primary", Used: float64(i+1) * 20, ObservedAt: at, ResetsAt: at.Add(5 * time.Hour), Method: "cli_reported"}
+		if e = s.Ingest(model.Batch{HostID: "h", At: at, AI: &model.AI{Quotas: []model.Quota{q}}}); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if e = s.Maintain(now); e != nil {
+		t.Fatal(e)
+	}
+	var hourly, daily int
+	s.DB.QueryRow(`SELECT COUNT(*) FROM ai_quotas_hourly`).Scan(&hourly)
+	s.DB.QueryRow(`SELECT COUNT(*) FROM ai_quotas_daily`).Scan(&daily)
+	if hourly != 1 || daily != 1 {
+		t.Fatalf("hourly=%d daily=%d", hourly, daily)
+	}
+	quotas, e := s.Quotas("h")
+	if e != nil || len(quotas) != 1 || quotas[0].Used != 20 {
+		t.Fatalf("quotas=%v err=%v", quotas, e)
+	}
+}
+
+func TestClaudeQuotaEstimateLabel(t *testing.T) {
+	s, e := Open(filepath.Join(t.TempDir(), "estimate.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	id := strings.Repeat("a", 64)
+	if e = s.Ingest(model.Batch{HostID: "h", At: now, AI: &model.AI{Usage: []model.AIUsage{{ID: strings.Repeat("b", 64), Session: id, Kind: "claude", At: now, Source: "log", Tokens: model.Tokens{Input: 25}}}}}); e != nil {
+		t.Fatal(e)
+	}
+	q := s.ClaudeEstimates("h", 100, 200)
+	if len(q) != 2 || q[0].Method != "estimated" || q[0].Used != 25 {
+		t.Fatalf("estimates: %+v", q)
+	}
+}

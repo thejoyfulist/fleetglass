@@ -1,0 +1,4 @@
+{"MESSAGE":"Accepted publickey for agent from 192.0.2.24 port 5442 ssh2","SYSLOG_IDENTIFIER":"sshd","__REALTIME_TIMESTAMP":"1700000000000000"}
+{"MESSAGE":"Accepted password for guest from 203.0.113.42 port 2341 ssh2","SYSLOG_IDENTIFIER":"sshd","__REALTIME_TIMESTAMP":"1700000001000000"}
+{"MESSAGE":"Failed password for invalid user root from 203.0.113.42 port 3333 ssh2","SYSLOG_IDENTIFIER":"sshd","__REALTIME_TIMESTAMP":"1700000002000000"}
+{"MESSAGE":"agent : TTY=pts/1 ; PWD=/tmp ; USER=root ; COMMAND=/usr/bin/true","SYSLOG_IDENTIFIER":"sudo","__REALTIME_TIMESTAMP":"1700000003000000"}

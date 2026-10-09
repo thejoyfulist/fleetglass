@@ -1,0 +1,4 @@
+{"MESSAGE":"refresh failed token=abcd1234 and https://name:pass@example.test/a","_SYSTEMD_UNIT":"livepatch.service","PRIORITY":"3","__REALTIME_TIMESTAMP":"1700000000000000"}
+{"MESSAGE":"refresh failed Bearer abcdefghijklmnopqrstuvwxyz","_SYSTEMD_UNIT":"livepatch.service","PRIORITY":"3","__REALTIME_TIMESTAMP":"1700000001000000"}
+{"MESSAGE":"Killed process 42 (python3) total-vm:42","_TRANSPORT":"kernel","PRIORITY":"2","__REALTIME_TIMESTAMP":"1700000002000000"}
+{"MESSAGE":"warning ignored","_SYSTEMD_UNIT":"ignored.service","PRIORITY":"4","__REALTIME_TIMESTAMP":"1700000003000000"}

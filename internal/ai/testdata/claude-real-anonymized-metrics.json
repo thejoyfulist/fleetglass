@@ -1,0 +1,61 @@
+[
+  {
+    "name": "claude_code.cost.usage",
+    "attributes": {
+      "session.id": "fixture-session",
+      "model": "claude-opus-5-5",
+      "value": "0.0029460000000000003",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "unknown.field": "private unknown"
+    }
+  },
+  {
+    "name": "claude_code.token.usage",
+    "attributes": {
+      "session.id": "fixture-session",
+      "model": "claude-opus-5-5",
+      "type": "input",
+      "value": "2.0",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "unknown.field": "private unknown"
+    }
+  },
+  {
+    "name": "claude_code.token.usage",
+    "attributes": {
+      "session.id": "fixture-session",
+      "model": "claude-opus-5-5",
+      "type": "output",
+      "value": "6.0",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "unknown.field": "private unknown"
+    }
+  },
+  {
+    "name": "claude_code.token.usage",
+    "attributes": {
+      "session.id": "fixture-session",
+      "model": "claude-opus-5-5",
+      "type": "cacheRead",
+      "value": "14090.0",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "unknown.field": "private unknown"
+    }
+  },
+  {
+    "name": "claude_code.token.usage",
+    "attributes": {
+      "session.id": "fixture-session",
+      "model": "claude-opus-5-5",
+      "type": "cacheCreation",
+      "value": "0.0",
+      "user.email": "private@example.invalid",
+      "user.account_id": "private-account",
+      "unknown.field": "private unknown"
+    }
+  }
+]
