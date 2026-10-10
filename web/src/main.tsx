@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { AreaChart, Bars, Gauge, Meter, ResponseChart, Ring, Sparkline } from "./charts";
+import { AreaChart, Bars, Gauge, ResponseChart, Ring, Sparkline } from "./charts";
 import {
   availableTiles,
   changeDetail,
   resultDetail,
   agentName,
-  agentReason,
   agentSource,
   agentState,
   cockpitNetwork,
@@ -72,11 +71,11 @@ import type {
   Usage,
 } from "./data";
 import { browserLiveSource, connectLive } from "./live";
-import { ProjectsView, StorageView, InsightsPanel, insightDetail } from "./observations";
+import { ProjectsView, StorageView, InsightsPanel } from "./observations";
 import { defaultPreferences, hasPreferences, readPreferences, savePreferences, useCockpitLanguage, SettingsView, ShareView, Explain, formatAppCPU, t } from "./preferences";
 import type { Preferences } from "./preferences";
 import { activeLanguage, choiceLabel, navigationLabels, plural, sectionLabels, setLanguage, t as message } from "./i18n";
-import { TerminalOverview } from "./terminal";
+import { TerminalOverview, TerminalTable, TerminalFilter, TerminalKV, TerminalBar } from "./terminal";
 import type { MessageKey } from "./i18n";
 import "./tokens.css";
 import "./style.css";
@@ -128,6 +127,7 @@ function useCockpit(host: string, range: Range, authorized: boolean, currency: s
     [agents, setAgents] = useState<Session[]>([]),
     [usage, setUsage] = useState<Usage[]>([]),
     [sessionUsage, setSessionUsage] = useState<Usage[]>([]),
+    [sessionDetails,setSessionDetails] = useState<Record<string,SessionDetail>>({}),
     [models, setModels] = useState<Usage[]>([]),
     [quotas, setQuotas] = useState<Quota[]>([]),
     [costs, setCosts] = useState<Cost[]>([]),
@@ -176,6 +176,10 @@ function useCockpit(host: string, range: Range, authorized: boolean, currency: s
       if (request !== requestId.current) return;
       setOverview(o as Overview);
       setAgents(a as Session[]);
+      void Promise.allSettled((a as Session[]).slice(0,8).map(session=>get<SessionDetail>(`${base}/agents/${encodeURIComponent(session.id)}?display_currency=${currency}`))).then(details=>{
+        if(request!==requestId.current)return;
+        setSessionDetails(Object.fromEntries(details.flatMap((item,index)=>item.status==="fulfilled"?[[((a as Session[])[index]).id,item.value]]:[])));
+      });
       setUsage(u as Usage[]);
       setModels(m as Usage[]);
       setSessionUsage(s as Usage[]);
@@ -203,6 +207,7 @@ function useCockpit(host: string, range: Range, authorized: boolean, currency: s
     setAgents([]);
     setUsage([]);
     setSessionUsage([]);
+    setSessionDetails({});
     setModels([]);
     setQuotas([]);
     setCosts([]);
@@ -292,10 +297,12 @@ function useCockpit(host: string, range: Range, authorized: boolean, currency: s
   }, [host, authorized, refresh]);
   return {
     host,
+    range,
     overview,
     agents,
     usage,
     sessionUsage,
+    sessionDetails,
     models,
     quotas,
     costs,
@@ -374,58 +381,23 @@ function List({
   items: { name: string; detail?: string; end?: string; state?: string }[];
 }) {
   if (!items.length) return <Empty>{t("ui.no.observations.reported.e045a")}</Empty>;
-  return (
-    <ul className="list">
-      {items.map((i, k) => (
-        <li key={i.name + k}>
-          <span
-            className={
-              i.state === "warn" || i.state === "crit" || i.state === "stale"
-                ? "attention"
-                : ""
-            }
-          >
-            {i.name}
-            {i.state === "stale" ? " (stale)" : ""}
-          </span>
-          {i.detail ? <em>{i.detail}</em> : null}
-          <small>{i.end}</small>
-        </li>
-      ))}
-    </ul>
-  );
+  return <TerminalTable heads={[t("terminal.label_name"),t("terminal.label_detail"),t("terminal.label_value")]} rows={items.map(i=>[
+    <span className={i.state==="warn"?"terminal-warn":i.state==="crit"?"terminal-crit":undefined}>{i.name}{i.state==="stale"?" (stale)":""}</span>,
+    i.detail ?? "", i.end ?? "",
+  ])}/>;
 }
 function Table({
   heads,
   rows,
   rowIds,
+  right = [],
 }: {
   heads: string[];
   rows: React.ReactNode[][];
   rowIds?: string[];
+  right?: number[];
 }) {
-  return (
-    <div className="tw">
-      <table>
-        <thead>
-          <tr>
-            {heads.map((h) => (
-              <th key={h}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} id={rowIds?.[i]}>
-              {row.map((cell, j) => (
-                <td key={j}>{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  return <TerminalTable heads={heads} rows={rows} rowIds={rowIds} right={right}/>;
 }
 function Empty({ children }: { children: React.ReactNode }) {
   return <p className="empty">{children}</p>;
@@ -551,75 +523,16 @@ function AgentTable({
   if (!agents.length) return <Empty>{t("ui.no.agent.sessions.reported.f9f1f")}</Empty>;
   return (
     <>
-      <div className="agent-cards">
-        {agents.map((a) => (
-          <article
-            className="agent-card"
-            key={a.id}
-            id={`mobile-session-${a.id}`}
-          >
-            <div className="agent-card-head">
-              <b>
-                {agentName(a.kind)}
-                {a.session_count && a.session_count > 1
-                  ? ` · ${t("agent.session_count", {count:a.session_count})}`
-                  : ""}
-              </b>
-              <span
-                className={
-                  a.state === "waiting-for-input" ||
-                  a.state === "erroring" ||
-                  a.state === "rate-limited"
-                    ? "attention"
-                    : ""
-                }
-              >
-                {agentState(a.state)}
-              </span>
-            </div>
-            <dl>
-              <div>
-                <dt>{t("ui.project.f6f4d")}</dt>
-                <dd>{a.project || t("value.unknown")}</dd>
-              </div>
-              <div>
-                <dt>{t("ui.cpu.ff221")}</dt>
-                <dd>
-                  {a.pid ? `${formatPercent(a.cpu_percent || 0)}` : t("ui.unknown.bc781")}
-                </dd>
-              </div>
-              <div>
-                <dt>{t("ui.memory.89c8a")}</dt>
-                <dd>{a.pid ? formatBytes(a.rss_bytes || 0) : t("ui.unknown.bc781")}</dd>
-              </div>
-              <div>
-                <dt>{t("ui.tokens.c38c6")}</dt>
-                <dd>
-                  {tokens.has(a.id)
-                    ? formatTokens(tokens.get(a.id)!)
-                    : t("ui.unknown.bc781")}
-                </dd>
-              </div>
-            </dl>
-            {!compact ? (
-              <small>
-                {a.worktree || t("value.unknown_worktree")} ·{" "}
-                {a.model || t("value.unknown_model")} ·{" "}
-                {agentReason(a)}
-              </small>
-            ) : null}
-            {!compact?<button className="quiet" onClick={()=>choose(a.id)}>{t("session.open")}</button>:null}
-          </article>
-        ))}
-      </div>
+
       {!compact && detail?<section className="g t session-detail" id="session-detail"><div className="h"><h2>{t("session.title",{agent:agentName(detail.session.kind)})}</h2><span className="src">{detail.session.model||t("value.unknown_model")}</span></div>
-        <div className="session-grid"><span>{t("session.start")}: <b>{hasDate(detail.session.started_at)?formatDateTime(detail.session.started_at):t("value.unknown")}</b></span><span>{t("session.end")}: <b>{hasDate(detail.session.ended_at)?formatDateTime(detail.session.ended_at):t("session.running")}</b></span><span>{t("session.duration")}: <b>{hasDate(detail.session.started_at)?formatDuration(Math.max(0,(new Date(hasDate(detail.session.ended_at)?detail.session.ended_at:Date.now()).getTime()-new Date(detail.session.started_at).getTime())/1000)):t("value.unknown")}</b></span><span>{t("ui.cpu.ff221")}: <b>{detail.session.cpu_seconds?formatDuration(detail.session.cpu_seconds):t("value.unknown")}</b></span><span>{t("ui.memory.89c8a")}: <b>{detail.session.peak_rss_bytes?`${formatBytes(detail.session.peak_rss_bytes)} ${t("session.peak")}`:t("value.unknown")}</b></span><span>{t("ui.tokens.c38c6")}: <b>{detail.usage_measured?t("session.tokens_rate",{tokens:formatTokens(total(detail.tokens)),rate:formatNumber(detail.tokens_per_minute,1)}):t("value.unknown")}</b></span><span>{t("ui.api.equivalent.3504a")}: <b>{detail.usage_measured?formatConverted(detail.api_money,detail.api_equivalent_usd):t("value.unknown")}</b></span><span>{t("cost.cli_reported")}: <b>{detail.cli_reported_usd?formatConverted(detail.cli_money,detail.cli_reported_usd):t("value.unknown")}</b></span><span>{t("ui.project.f6f4d")}: <b>{detail.session.project||t("value.unknown")} / {detail.session.worktree||t("value.unknown_worktree")}</b></span></div>
+        <TerminalKV rows={[[t("session.start"),hasDate(detail.session.started_at)?formatDateTime(detail.session.started_at):t("value.unknown")],[t("session.end"),hasDate(detail.session.ended_at)?formatDateTime(detail.session.ended_at):t("session.running")],[t("session.duration"),hasDate(detail.session.started_at)?formatDuration(Math.max(0,(new Date(hasDate(detail.session.ended_at)?detail.session.ended_at:Date.now()).getTime()-new Date(detail.session.started_at).getTime())/1000)):t("value.unknown")],[t("ui.cpu.ff221"),detail.session.cpu_seconds?formatDuration(detail.session.cpu_seconds):t("value.unknown")],[t("ui.memory.89c8a"),detail.session.peak_rss_bytes?formatBytes(detail.session.peak_rss_bytes):t("value.unknown")],[t("ui.tokens.c38c6"),detail.usage_measured?formatTokens(total(detail.tokens)):t("value.unknown")],[t("ui.project.f6f4d"),detail.session.project||t("value.unknown")]]}/>
         <h3>{t("session.spawned")}</h3>{detail.processes.length?<ul>{detail.processes.map(p=><li key={p.pid}>{p.name} · {p.pid} · {formatBytes(p.memory_bytes)}{p.left_behind?` · ${t("project.left_behind")}`:""}</li>)}</ul>:<p>{t("session.no_spawned")}</p>}
         <SpeedPanel speed={detail.speed} host={host} session={detail.session.id}/>
       </section>:null}
       <div className="agent-table">
         <Table
           rowIds={agents.map((a) => `session-${a.id}`)}
+          right={[3,4,5]}
           heads={
             compact
               ? [t("ui.agent.5ce2e"), t("ui.state.a7250"), t("ui.cpu.ff221"), t("ui.memory.89c8a"), t("ui.tokens.c38c6")]
@@ -634,23 +547,7 @@ function AgentTable({
                 ]
           }
           rows={agents.map((a) => {
-            const first = (
-              <span className="who">
-                <span className={`av ${a.kind === "claude" ? "c" : "x"}`}>
-                  {a.kind === "claude" ? "C" : "X"}
-                </span>
-                <span>
-                  {a.project || a.kind}
-                  <small>
-                    {agentName(a.kind)} ·{" "}
-                    {a.session_count && a.session_count > 1
-                      ? `${t("agent.session_count", {count:a.session_count})} · ${a.user || t("value.unknown_user")}`
-                      : a.worktree || a.user || t("value.unknown_worktree")}
-                  </small>
-                  {!compact?<button className="quiet" onClick={()=>choose(a.id)}>{t("session.open")}</button>:null}
-                </span>
-              </span>
-            );
+            const first = <button type="button" className="terminal-link" onClick={()=>choose(a.id)}>{a.id.slice(0,16)}</button>;
             return compact
               ? [
                   first,
@@ -662,7 +559,7 @@ function AgentTable({
                     {agentState(a.state)}
                   </span>,
                   a.pid ? (
-                    <Meter value={a.cpu_percent || 0} max={200} />
+                    <>{formatPercent(a.cpu_percent || 0)} <TerminalBar percent={a.cpu_percent || 0} width={8}/></>
                   ) : (
                     "Unknown"
                   ),
@@ -674,22 +571,9 @@ function AgentTable({
               : [
                   first,
                   `${a.project || t("value.unknown")} / ${a.worktree || t("value.unknown")}`,
-                  <>
-                    <span
-                      className={
-                        a.state === "erroring" || a.state === "rate-limited"
-                          ? "attention"
-                          : ""
-                      }
-                    >
-                      {agentState(a.state)}
-                    </span>
-                    <small className="muted block">
-                      {agentReason(a)}
-                    </small>
-                  </>,
+                  <span className={a.state === "erroring" || a.state === "rate-limited" ? "attention" : ""}>{agentState(a.state)}</span>,
                   a.pid ? (
-                    <Meter value={a.cpu_percent || 0} max={200} />
+                    <>{formatPercent(a.cpu_percent || 0)} <TerminalBar percent={a.cpu_percent || 0} width={8}/></>
                   ) : (
                     "Unknown"
                   ),
@@ -761,13 +645,8 @@ function SpeedPanel({speed,host,session}: {speed:SpeedSummary[];host?:string;ses
   const [historical,setHistorical] = useState<SpeedSummary[]>([]);
   useEffect(()=>{if(window!=="24h"||!host)return;let active=true;get<SpeedSummary[]>(`/api/v1/hosts/${encodeURIComponent(host)}/ai/speed?range=24h${session?`&session=${encodeURIComponent(session)}`:""}`).then(rows=>{if(active)setHistorical(rows)}).catch(()=>{if(active)setHistorical([])});return()=>{active=false}},[window,host,session]);
   const visible=window==="24h"?historical:speed;
-  return <><div className="speed-controls"><button aria-pressed={window==="1h"} onClick={()=>setWindow("1h")}>{t("speed.one_hour")}</button><button aria-pressed={window==="24h"} onClick={()=>setWindow("24h")}>{t("speed.day")}</button></div>{!visible.length?<Empty>{t("speed.no_data")}</Empty>:<div className="speed-grid">{visible.map(s=><div className="speed-item" key={`${s.kind}:${s.model}:${s.method}`}>
-    <div className="row"><b>{agentName(s.kind)} · {s.model || t("value.unknown_model")}</b><small>{s.method==="estimated"?t("speed.estimated"):s.method==="otlp"?t("speed.otlp"):t("speed.unmeasured")}</small></div>
-    <strong>{s.live_tokens_per_second!==null?formatNumber(s.live_tokens_per_second,1):s.median_tokens_per_second!==null?formatNumber(s.median_tokens_per_second,1):"—"} <small>{t("speed.tokens_second")} · {s.live_tokens_per_second!==null?t("speed.live"):t("speed.median")}</small></strong>
-    <p>{t("speed.median_p95",{median:s.median_tokens_per_second===null?"—":formatNumber(s.median_tokens_per_second,1),p95:s.p95_tokens_per_second===null?"—":formatNumber(s.p95_tokens_per_second,1)})}</p>
-    <p>{t("speed.request_metrics",{duration:s.median_duration_ms===null?"—":`${formatNumber(s.median_duration_ms,0)} ms`,first:s.median_first_token_ms===null?"—":`${formatNumber(s.median_first_token_ms,0)} ms`})}</p>
-    <p>{t("speed.activity",{tokens:formatNumber(s.tokens_per_minute,1),requests:formatNumber(s.requests_per_minute,1),errors:s.api_errors,retries:s.retries})}</p>
-  </div>)}</div>}</>;
+  return <><div className="speed-controls"><button aria-pressed={window==="1h"} onClick={()=>setWindow("1h")}>{t("speed.one_hour")}</button><button aria-pressed={window==="24h"} onClick={()=>setWindow("24h")}>{t("speed.day")}</button></div>{!visible.length?<Empty>{t("speed.no_data")}</Empty>:<TerminalTable heads={[t("terminal.label_model"),t("ui.method.88306"),t("terminal.label_tokens_second"),t("terminal.label_median"),t("terminal.label_p95"),t("terminal.label_tokens_minute"),t("terminal.label_requests_minute"),t("terminal.label_errors"),t("terminal.label_retries")]} right={[2,3,4,5,6,7,8]} rows={visible.map(s=>[`${agentName(s.kind)} · ${s.model||t("value.unknown_model")}`,s.method,s.live_tokens_per_second===null?"—":`${s.method==="estimated"?"~":""}${formatNumber(s.live_tokens_per_second,1)}`,s.median_tokens_per_second===null?"—":formatNumber(s.median_tokens_per_second,1),s.p95_tokens_per_second===null?"—":formatNumber(s.p95_tokens_per_second,1),formatNumber(s.tokens_per_minute,1),formatNumber(s.requests_per_minute,1),String(s.api_errors),String(s.retries)])}/>}</>;
+
 }
 function UsageTile({ usage }: { usage: Usage[] }) {
   const sorted = [...usage].sort((a, b) => total(b.tokens) - total(a.tokens)),
@@ -1134,14 +1013,16 @@ function PageHead({
 function AgentsView({ data }: { data: ReturnType<typeof useCockpit> }) {
   const [kind, setKind] = useState("All"),
     [project, setProject] = useState("All"),
-    [state, setState] = useState("All");
+    [state, setState] = useState("All"),
+    [query,setQuery] = useState("");
   const agents = data.agents,
     projects = ["All", ...new Set(agents.map((a) => a.project || t("value.unknown")))],
     filtered = agents.filter(
       (a) =>
         (kind === "All" || a.kind === kind) &&
         (project === "All" || (a.project || t("value.unknown")) === project) &&
-        (state === "All" || a.state === state),
+        (state === "All" || a.state === state) &&
+        `${a.id} ${a.project??""} ${a.model??""}`.toLowerCase().includes(query.toLowerCase()),
     );
   return (
     <>
@@ -1156,39 +1037,7 @@ function AgentsView({ data }: { data: ReturnType<typeof useCockpit> }) {
           source={t("agents.filtered_count", {shown:filtered.length,total:agents.length})}
           className="full"
         >
-          <div className="filters">
-            <label>
-              {" "}{t("ui.agent.5ce2e")}{" "}
-              <select value={kind} onChange={(e) => setKind(e.target.value)}>
-                {["All", ...new Set(agents.map((a) => a.kind))].map((x) => (
-                  <option key={x} value={x}>
-                    {x === "All" ? choiceLabel(x) : agentName(x)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {" "}{t("ui.project.f6f4d")}{" "}
-              <select
-                value={project}
-                onChange={(e) => setProject(e.target.value)}
-              >
-                {projects.map((x) => (
-                  <option key={x} value={x}>{x === "All" ? choiceLabel(x) : x}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {" "}{t("ui.state.a7250")}{" "}
-              <select value={state} onChange={(e) => setState(e.target.value)}>
-                {["All", ...new Set(agents.map((a) => a.state))].map((x) => (
-                  <option key={x} value={x}>
-                    {x === "All" ? choiceLabel(x) : agentState(x)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <div className="terminal-filters"><TerminalFilter label={t("ui.agent.5ce2e")} choices={["All",...new Set(agents.map(a=>a.kind))]} value={kind} onChange={setKind} display={v=>v==="All"?choiceLabel(v):agentName(v)}/><TerminalFilter label={t("ui.project.f6f4d")} choices={projects} value={project} onChange={setProject} display={v=>v==="All"?choiceLabel(v):v}/><TerminalFilter label={t("ui.state.a7250")} choices={["All",...new Set(agents.map(a=>a.state))]} value={state} onChange={setState} display={v=>v==="All"?choiceLabel(v):agentState(v)}/><label>{t("terminal.search")} <input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="/"/></label></div>
           <AgentTable agents={filtered} usage={data.sessionUsage} host={data.host} />
         </Tile>
         <Tile title={t("speed.title")} source={t("speed.last_hour")} className="full"><SpeedPanel speed={data.speed} host={data.host}/></Tile>
@@ -1345,13 +1194,13 @@ function SubsystemPanel({section,data,range}:{section:string;data:ReturnType<typ
 	return <div className="bento subsystem-grid">
 		<Tile title={t("machine.now", {section:choiceLabel(section)})} source={t("ui.host.measurements.082dd")} className="half">
 			{metrics[section]?<div className="stat-grid">{metrics[section].map(([label,v,explanationKey])=><div key={label}><span>{label}<Explain title={label} language={readPreferences().language} messageKey={explanationKey}/></span><b>{v}</b></div>)}</div>:rows.length?<List items={rows}/>:<Empty>{t("ui.no.measurements.reported.079d3")}</Empty>}
-			{section==="CPU"?Object.entries(cpu?.values||{}).filter(([k])=>/^core_\d+_percent$/.test(k)).length?<div className="core-grid">{Object.entries(cpu?.values||{}).filter(([k])=>/^core_\d+_percent$/.test(k)).map(([k,v])=><div key={k}><span>{t("machine.core", {number:k.replace("core_", "").replace("_percent", "")})}</span><div className="core-track"><i style={{width:`${Math.min(100,v)}%`}}/></div><b>{formatPercent(v)}</b></div>)}</div>:null:null}
+			{section==="CPU"?Object.entries(cpu?.values||{}).filter(([k])=>/^core_\d+_percent$/.test(k)).length?<div className="core-grid">{Object.entries(cpu?.values||{}).filter(([k])=>/^core_\d+_percent$/.test(k)).map(([k,v])=><div key={k}><span>{t("machine.core", {number:k.replace("core_", "").replace("_percent", "")})}</span><TerminalBar percent={v} width={12}/><b>{formatPercent(v)}</b></div>)}</div>:null:null}
 		</Tile>
 		<Tile title={t("ui.history.90ccd")} source={`${t(section === "Disk" ? "machine.drive_write" : section === "Network" ? "machine.receive" : section === "Memory" ? "machine.used_bytes" : section === "CPU" ? "ui.cpu.a2ccb" : section === "GPU" ? "machine.gpu_percent" : "machine.host_cpu")} · ${range}`} className="half"><AreaChart primary={data.series[metric]||[]} label={t("machine.history", {section:choiceLabel(section)})} period={range} changes={data.changes} unit={section==="Memory"?"bytes":section==="Disk"||section==="Network"?"rate":"percent"}/></Tile>
 		{section==="Disk"?<Tile title={t("ui.volumes.39c0e")} className="half"><List items={matching(r,"disk:").map(d=>({name:mountName(d.name),detail:t("machine.disk_space", {used:formatBytes(value(d,"used_bytes")), free:formatBytes((value(d,"total_bytes")??0)-(value(d,"used_bytes")??0))}),end:formatBytes(value(d,"total_bytes")),state:d.state}))}/></Tile>:null}
 		{section==="Memory"?<Tile title={t("ui.memory.pressure.ff290")} explanationKey="explain.pressure" className="half"><p className="foot">{t("ui.psi.reports.the.share.of.time.tasks.waited.for.m.0bf4c")}</p><div className="stat-grid">{["avg10","avg60","avg300"].map(k=><div key={k}><span>{k}</span><b>{value(mem,"pressure_some_"+k)===null?t("ui.unknown.bc781"):formatPercent(value(mem,"pressure_some_"+k))}</b></div>)}</div></Tile>:null}
 		{section==="Network"?<Tile title={t("ui.traffic.by.interface.c13ca")} source={t("ui.measured.counter.changes.b99ac")} className="half"><List items={data.traffic.map(traffic=>({name:traffic.name.slice(8),detail:t("machine.traffic_today", {inbound:formatNetworkAmount(traffic.today_rx_bytes),outbound:formatNetworkAmount(traffic.today_tx_bytes)}),end:`7 d ${formatNetworkAmount(traffic.week_rx_bytes+traffic.week_tx_bytes)} · 30 d ${formatNetworkAmount(traffic.month_rx_bytes+traffic.month_tx_bytes)}`}))}/></Tile>:null}
-		{section==="Containers"?<Tile title={t("ui.container.resources.9b1e1")} source={t("ui.per.container.289a4")} className="half"><div className="container-grid">{data.apps.apps.filter(a=>a.kind==="container").map(a=><article key={a.name}><h3>{a.name}</h3><dl><div><dt>{t("ui.cpu.ff221")}</dt><dd>{formatAppCPU(a.cpu_percent)}</dd></div><div><dt>{t("ui.memory.89c8a")}</dt><dd>{formatBytes(a.memory_bytes)}</dd></div><div><dt>{t("ui.network.53ebc")}</dt><dd>{a.network_rx_bytes_per_second===undefined?t("ui.not.measured.6e95b"):formatNetworkRate(a.network_rx_bytes_per_second+(a.network_tx_bytes_per_second||0))}</dd></div><div><dt>{t("ui.block.i.o.884a2")}</dt><dd>{formatRate(a.disk_read_bytes_per_second+a.disk_write_bytes_per_second)}</dd></div><div><dt>{t("ui.restarts.81727")}</dt><dd>{value(matching(r,"container:").find(x=>x.name.endsWith(":"+a.name)),"restart_count")??t("value.unknown")}</dd></div></dl></article>)}</div></Tile>:null}
+		{section==="Containers"?<Tile title={t("ui.container.resources.9b1e1")} source={t("ui.per.container.289a4")} className="half"><TerminalTable heads={[t("terminal.label_name"),t("ui.cpu.ff221"),t("ui.memory.89c8a"),t("ui.network.53ebc"),t("ui.block.i.o.884a2"),t("ui.restarts.81727")]} right={[1,2,3,4,5]} rows={data.apps.apps.filter(a=>a.kind==="container").map(a=>[a.name,formatAppCPU(a.cpu_percent),formatBytes(a.memory_bytes),a.network_rx_bytes_per_second===undefined?t("ui.not.measured.6e95b"):formatNetworkRate(a.network_rx_bytes_per_second+(a.network_tx_bytes_per_second||0)),formatRate(a.disk_read_bytes_per_second+a.disk_write_bytes_per_second),String(value(matching(r,"container:").find(x=>x.name.endsWith(":"+a.name)),"restart_count")??t("value.unknown"))])}/></Tile>:null}
 		{section==="CPU"||section==="GPU"?<Tile title={t("ui.measurement.notes.bdd57")} explanationKey="explain.coverage" source={t("ui.coverage.6dafb")} className="half measurement-notes"><p className="foot">{section === "CPU" ? t("machine.cpu_notes", {cpu:formatPercent(value(cpu,"busy_percent")), cores:value(cpu,"core_count") ?? t("value.unknown"), power:value(result(r,"cpu_package_power"),"watts") === null ? t("value.unknown") : formatNumber(value(result(r,"cpu_package_power"),"watts")!, 1)}) : t("machine.gpu_notes")}</p></Tile>:null}
 		<Tile title={t("ui.apps.behind.this.figure.612b6")} source={t("ui.measured.now.7782e")} className="half">{section==="GPU"?<Empty>{t("ui.per.app.gpu.use.is.not.measured.by.this.driver.f2aef")}</Empty>:<List items={relevant.map(a=>({name:a.kind === "other" ? t("app.other") : a.name,detail:choiceLabel(a.kind[0].toUpperCase()+a.kind.slice(1)),end:section==="Memory"?formatBytes(a.memory_bytes):section==="Disk"?formatRate(a.disk_read_bytes_per_second+a.disk_write_bytes_per_second):section==="Network"?a.network_rx_bytes_per_second===undefined?t("ui.not.measured.6e95b"):formatNetworkRate(a.network_rx_bytes_per_second+(a.network_tx_bytes_per_second||0)):formatAppCPU(a.cpu_percent)}))}/>}</Tile>
 	</div>;
@@ -1394,24 +1243,14 @@ function AppCatalog({data,range,setRange}:{data:ReturnType<typeof useCockpit>;ra
     <PageHead title={t("ui.apps.d9a36")} subtitle={t("ui.every.running.process.attributed.to.a.unit.conta.6b1d2")} range={range} setRange={setRange}/>
     <div className="app-intro g"><div><strong>{formatNumber(all.filter(a=>a.kind!=="other").length)}</strong><span>{t("ui.app.groups.measured.8135f")}</span></div><p>{t("ui.cpu.is.a.percentage.of.one.core.current.shares.a.69782")}</p></div>
     <div className="app-section-head"><h2>{t("ui.resource.owners.a20f8")}</h2><Segmented label={t("ui.rank.apps.by.bd839")} choices={["CPU","Memory","Disk","Network","Energy"]} value={metric} onChange={setMetric}/></div>
-    <div className="app-filters"><label>{t("ui.search.apps.ca3ce")}<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder={t("ui.app.name.c877c")}/></label><label>{t("ui.type.3deb7")}<select value={kind} onChange={e=>setKind(e.target.value)}>{["All types","Unit","Container","Agent"].map(k=><option key={k} value={k}>{choiceLabel(k)}</option>)}</select></label><span>{plural(ranked.length, "app.matching.one", "app.matching.many")}</span></div>
+    <div className="app-filters terminal-filters"><label>{t("terminal.search")} <input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="/"/></label><TerminalFilter label={t("ui.type.3deb7")} choices={["All types","Unit","Container","Agent"]} value={kind} onChange={setKind}/><span>{plural(ranked.length, "app.matching.one", "app.matching.many")}</span></div>
     <section className="app-list g" aria-label={t("ui.ranked.apps.887df")}>
-      <div className="app-list-header"><span>{t("ui.app.fc4a6")}</span><span>{t("ui.cpu.ff221")}</span><span>{t("ui.memory.89c8a")}</span><span>{t("ui.disk.read.write.23868")}</span><span>{t("ui.network.in.out.e4044")}</span><span>{t("ui.energy.estimate.48ed6")}</span><span>{t("ui.share.09ca5")}</span></div>
-      <div className="app-list-scroll" tabIndex={0} aria-label={t("ui.app.list.scroll.for.more.421e6")}>
-        {apps.length?apps.map(a=>{const id=`${a.kind}:${a.name}`; const amount=appMetric(a,metric); return <button type="button" className={`app-row ${a.kind==="other"?"app-row-other":""} ${selected===id?"selected":""}`} key={id} onClick={()=>setSelected(selected===id?null:id)} aria-expanded={selected===id}>
-          <span className="app-name"><strong>{a.kind === "other" ? t("app.other") : a.name}</strong><small className={`app-kind app-kind-${a.kind}`}>{choiceLabel(a.kind[0].toUpperCase()+a.kind.slice(1))}</small></span>
-          <span data-label={t("ui.cpu.ff221")}>{a.rates_ready?formatAppCPU(a.cpu_percent):t("ui.waiting.33d30")}</span>
-          <span data-label={t("ui.memory.89c8a")}>{formatBytes(a.memory_bytes)}</span>
-          <span data-label={t("ui.disk.read.write.23868")}>{a.rates_ready?`${formatRate(a.disk_read_bytes_per_second)} / ${formatRate(a.disk_write_bytes_per_second)}`:t("ui.waiting.33d30")}</span>
-          <span data-label={t("ui.network.in.out.e4044")}>{a.network_rx_bytes_per_second===undefined?t("ui.not.measured.6e95b"):`${formatNetworkRate(a.network_rx_bytes_per_second)} / ${formatNetworkRate(a.network_tx_bytes_per_second??0)}`}</span>
-          <span data-label={t("ui.energy.estimate.48ed6")}>{a.estimated_energy_watts===undefined?t("ui.not.measured.6e95b"):`${formatNumber(a.estimated_energy_watts, 1)} W ${t("quota.estimated")}`}</span>
-          <span className="app-share" aria-label={t("app.share", {metric:choiceLabel(metric), amount:amount === null ? t("app.not_measured") : formatPercent(100 * amount / max)})}><i style={{width:`${Math.min(100,100*(amount??0)/max)}%`}}/></span>
-        </button>}):<p className="app-empty">{t("ui.app.accounting.will.appear.after.the.agent.sends.e5bf7")}</p>}
-      </div>
-      {ranked.length===0 && all.length>0?<p className="foot">{t("ui.no.apps.match.this.search.or.type.584a6")}</p>:null}
+      <TerminalTable heads={[t("ui.app.fc4a6"),t("ui.cpu.ff221"),t("ui.memory.89c8a"),t("ui.disk.read.write.23868"),t("ui.network.in.out.e4044"),t("ui.energy.estimate.48ed6"),t("ui.share.09ca5")]} right={[1,2,3,4,5]} rows={apps.map(a=>{const id=`${a.kind}:${a.name}`;const amount=appMetric(a,metric);return [<button className="terminal-link" type="button" onClick={()=>setSelected(selected===id?null:id)} aria-expanded={selected===id}>{a.kind==="other"?t("app.other"):a.name}</button>,a.rates_ready?formatAppCPU(a.cpu_percent):t("ui.waiting.33d30"),formatBytes(a.memory_bytes),a.rates_ready?`${formatRate(a.disk_read_bytes_per_second)} / ${formatRate(a.disk_write_bytes_per_second)}`:"—",a.network_rx_bytes_per_second===undefined?t("ui.not.measured.6e95b"):`${formatNetworkRate(a.network_rx_bytes_per_second)} / ${formatNetworkRate(a.network_tx_bytes_per_second??0)}`,a.estimated_energy_watts===undefined?"—":`${formatNumber(a.estimated_energy_watts,1)} W`,<TerminalBar percent={amount===null?null:100*amount/max} width={10}/>]})}/>
+      {ranked.length===0&&all.length>0?<p className="foot">{t("ui.no.apps.match.this.search.or.type.584a6")}</p>:null}
     </section>
-    {current?<section className="app-detail g" aria-label={t("app.details", {name: current.name})}><div className="h"><h2>{current.name}</h2><button type="button" onClick={()=>setSelected(null)}>{t("ui.close.bbfa7")}</button></div><p className="foot">{choiceLabel(current.kind[0].toUpperCase()+current.kind.slice(1))} · {appValue(current,metric)} {choiceLabel(metric).toLowerCase()} · {current.counter_source === "cgroup" ? "cgroup" : current.counter_source === "proc" ? "proc" : t("app.host_counters")}</p>{data.observations.insights.filter(x=>x.app===current.name&&x.app_kind===current.kind).map(x=><p className="attention" key={x.kind}>{insightDetail(x)}</p>)}<div className="app-detail-grid"><div><h3>{t("ui.processes.ed730")}</h3>{current.processes?.length?<ul>{current.processes.map(p=><li key={p.pid}><span>{p.name}</span><code>{t("ui.pid.dde57")}{" "}{p.pid}</code></li>)}</ul>:<p className="foot">{t("ui.process.names.and.pids.will.appear.with.the.next.50811")}</p>}</div><div><h3>{t("ui.resource.history.4c4b5")}</h3><div className="app-trends">{["CPU","Memory","Disk","Network","Energy"].map(kind=><div key={kind}><span>{choiceLabel(kind)}</span><Sparkline values={data.apps.history.filter(p=>p.name===current.name&&p.kind===current.kind).map(p=>appMetric(p,kind)??0)} idLabel={`${current.name} ${kind} history`}/></div>)}</div><p className="foot">{t("ui.disk.today.6bb6e")}{" "}{formatBytes(current.disk_read_bytes)} {" "}{t("ui.read.2b422")}{" "}{formatBytes(current.disk_write_bytes)} {" "}{t("ui.written.page.cache.f02b7")}{" "}{current.counter_source==="cgroup"?formatBytes(current.page_cache_bytes):t("ui.not.measured.6e95b")}</p></div></div></section>:null}
-    <section className="app-hourly g"><div className="h"><h2>{t("ui.top.apps.hour.by.hour.367fc")}</h2><span className="src">{t("ui.last.48.hours.11ccc")}</span></div>{topHours.length?<><div className="app-hour-list">{topHours.slice(0,show48?48:12).map(h=><div className="app-hour" key={h.at}><time dateTime={h.at}>{appHourLabel(h.at)}</time><span><b>{t("ui.cpu.ff221")}</b>{h.cpu||t("ui.not.measured.6e95b")}</span><span><b>{t("ui.memory.89c8a")}</b>{h.memory||t("ui.not.measured.6e95b")}</span><span><b>{t("ui.disk.ef995")}</b>{h.disk||t("ui.not.measured.6e95b")}</span><span><b>{t("ui.network.53ebc")}</b>{h.network||t("ui.not.measured.6e95b")}</span></div>)}</div>{topHours.length>12?<button className="app-show-hours" type="button" onClick={()=>setShow48(!show48)}>{t(show48 ? "app.show_12h" : "app.show_48h")}</button>:null}</>:<Empty>{t("ui.hourly.leaders.appear.after.an.hour.of.measureme.092ce")}</Empty>}</section>
+    {current?<section className="app-detail g" aria-label={t("app.details", {name: current.name})}><div className="h"><h2>{current.name}</h2><button type="button" onClick={()=>setSelected(null)}>{t("ui.close.bbfa7")}</button></div><TerminalKV rows={[[t("ui.type.3deb7"),current.kind],[choiceLabel(metric),appValue(current,metric)],[t("ui.disk.today.6bb6e"),`${formatBytes(current.disk_read_bytes)} / ${formatBytes(current.disk_write_bytes)}`],[t("terminal.label_page_cache"),current.counter_source==="cgroup"?formatBytes(current.page_cache_bytes):t("ui.not.measured.6e95b")]]}/><TerminalTable heads={[t("ui.processes.ed730"),t("ui.pid.08323")]} right={[1]} rows={(current.processes??[]).map(p=>[p.name,String(p.pid)])}/></section>:null}
+    <section className="app-hourly g"><div className="h"><h2>{t("ui.top.apps.hour.by.hour.367fc")}</h2><span className="src">{t("ui.last.48.hours.11ccc")}</span></div>{topHours.length?<><TerminalTable heads={[t("terminal.label_time"),t("ui.cpu.ff221"),t("ui.memory.89c8a"),t("ui.disk.ef995"),t("ui.network.53ebc")]} rows={topHours.slice(0,show48?48:12).map(h=>[appHourLabel(h.at),h.cpu||t("ui.not.measured.6e95b"),h.memory||t("ui.not.measured.6e95b"),h.disk||t("ui.not.measured.6e95b"),h.network||t("ui.not.measured.6e95b")])}/>{topHours.length>12?<button className="terminal-link" type="button" onClick={()=>setShow48(!show48)}>{t(show48?"app.show_12h":"app.show_48h")}</button>:null}</>:<Empty>{t("ui.hourly.leaders.appear.after.an.hour.of.measureme.092ce")}</Empty>}</section>
+
   </>;
 }
 function ServicesView({ data }: { data: ReturnType<typeof useCockpit> }) {
@@ -1466,7 +1305,7 @@ function ServicesView({ data }: { data: ReturnType<typeof useCockpit> }) {
                   <List
                     items={ports.map((s) => ({
                       name: s.name.split(":").slice(1, -1).join(" · "),
-                      detail: resultDetail(s),
+                      detail: (()=>{const port=value(s,"port");const owner=data.observations.projects.find(p=>port!==null&&p.ports.includes(port));return owner?`${owner.project} / ${owner.name}`:resultDetail(s)})(),
                       end: statusLabel(s.state),
                       state: s.state,
                     }))}
@@ -1499,7 +1338,7 @@ function ChangesView({data}:{data:ReturnType<typeof useCockpit>}) {
   const rows=data.changes.filter(c=>(kind==="All"||c.type===kind)&&Date.now()-new Date(c.at).getTime()<=duration);
   return <><div className="page-head"><div><h1>{t("ui.changes.8aa57")}</h1><p>{t("ui.package.service.boot.merge.container.and.configu.fe439")}</p></div><Segmented label={t("ui.change.period.aaa89")} choices={["24h","7d","30d","1y"]} value={period} onChange={setPeriod}/></div>
     <div className="bento compact-rows"><Tile title={t("ui.change.journal.642e1")} source={t("change.local_history", {count:rows.length})} className="half">
-      <label className="change-filter">{t("ui.type.3deb7")}{" "}<select className="themed-select" aria-label={t("ui.change.type.6e6f6")} value={kind} onChange={e=>setKind(e.target.value)}>{["All","APT","Service","Boot","Git","Container","Marker","Heat"].map(x=><option key={x} value={x}>{x === "All" ? choiceLabel(x) : changeLabel(x as Change["type"])}</option>)}</select></label>
+      <div className="terminal-filters"><TerminalFilter label={t("ui.type.3deb7")} choices={["All","APT","Service","Boot","Git","Container","Marker","Heat"]} value={kind} onChange={setKind}/></div>
       {rows.length ? <List items={rows.map(c=>({name:changeLabel(c.type),detail:changeDetail(c),end:shortDate(c.at)}))} /> : <Empty>{t("ui.no.changes.in.this.period.88120")}</Empty>}
     </Tile></div></>;
 }
@@ -1532,7 +1371,7 @@ function CostsView({
       />
       <div className="bento compact-rows">
         <Tile title={t("subscription.title")} source={t("subscription.this_month")} className="full">
-          <div className="subscription-grid">{data.subscriptions.map(s=><div key={s.kind} className="subscription-item"><b>{agentName(s.kind)}</b><strong>{formatConverted(s.api_money,s.api_equivalent_usd)}</strong><span>{t("subscription.api_equivalent")}</span><p>{s.subscription_amount==null && s.subscription_usd===null?t("subscription.configure"):t("subscription.comparison",{amount:formatConverted(s.subscription_money || undefined,s.subscription_amount ?? s.subscription_usd ?? 0)})}</p>{s.coverage==="partial"?<small>{t("cost.partial",{tokens:formatTokens(s.unpriced_tokens)})}</small>:null}</div>)}</div>
+          <TerminalTable heads={[t("terminal.label_plan"),t("subscription.api_equivalent"),t("ui.month.cost.dedfe"),t("terminal.label_state")]} right={[1,2]} rows={data.subscriptions.map(s=>[agentName(s.kind),formatConverted(s.api_money,s.api_equivalent_usd),s.subscription_usd===null?t("terminal.not_collected"):formatConverted(s.subscription_money||undefined,s.subscription_amount??s.subscription_usd),s.coverage])}/>
         </Tile>
         {data.energy?.month_seconds ? <Tile title={t("ui.energy.437bc")} source={t("ui.cpu.package.only.56d4b")} className="half">
           <div className="stat-grid"><div><span>{t("ui.today.24345")}</span><b>{formatNumber(data.energy.today_kwh, 3)} {" "}{t("ui.kwh.72c28")}</b></div><div><span>{t("ui.this.month.1b478")}</span><b>{formatNumber(data.energy.month_kwh, 3)} {" "}{t("ui.kwh.72c28")}</b></div><div><span>{t("ui.today.cost.193fc")}</span><MoneyStat money={data.energy.today_money} amount={data.energy.today_cost} currency={data.energy.currency}/></div><div><span>{t("ui.month.cost.dedfe")}</span><MoneyStat money={data.energy.month_money} amount={data.energy.month_cost} currency={data.energy.currency}/></div></div>
@@ -1557,27 +1396,6 @@ function CostsView({
                       : t("ui.reported.share.c6c3e"),
                   ])}
                 />
-              </div>
-              <div className="cost-cards">
-                {data.costs.map((c, i) => (
-                  <article
-                    className="agent-card"
-                    key={`${c.project}-${c.method}-${i}`}
-                  >
-                    <div className="agent-card-head">
-                      <b>{c.project}</b>
-                      <strong>{formatConverted(costMoney(c))}</strong>
-                    </div>
-                    <p>
-                      {costMethodLabel(c.method)}
-                    </p>
-                    <small>
-                      {c.partial
-                        ? t("cost.partial", {tokens:formatTokens(c.unpriced_tokens || 0)})
-                        : t("ui.reported.share.c6c3e")}
-                    </small>
-                  </article>
-                ))}
               </div>
             </>
           ) : (
@@ -1625,16 +1443,10 @@ function FleetView({hosts, selectHost, go}: {hosts:FleetHost[];selectHost:(id:st
       <Tile title={t("ui.ai.usage.24.h.fae99")} className="fleet-stat"><strong>{formatTokens(usage)}</strong><span>{t("ui.tokens.across.all.hosts.f1666")}</span></Tile>
       <Tile title={t("ui.ai.cost.24.h.f1814")} className="fleet-stat"><strong>{formatMoneyTotal(moneyRows)}</strong><span>{t("ui.api.equivalent.estimate.6f668")}</span></Tile>
     </div>
-    <div className="fleet-controls g"><label>{t("ui.label.74341")}{" "}<select aria-label={t("ui.filter.by.label.7fed9")} value={label} onChange={e=>setLabel(e.target.value)}><option value="all">{t("ui.all.labels.f3c87")}</option>{labels.map(x=><option key={x}>{x}</option>)}</select></label><label>{t("ui.state.a7250")}{" "}<select aria-label={t("ui.filter.by.state.b3e5d")} value={state} onChange={e=>setState(e.target.value)}><option value="all">{t("ui.all.states.1740d")}</option>{["live","silent","offline"].map(x=><option key={x} value={x}>{t(x === "live" ? "state.live" : x === "silent" ? "state.silent" : "state.offline")}</option>)}</select></label><label>{t("ui.sort.adc4e")}{" "}<select aria-label={t("ui.sort.hosts.7af73")} value={sort} onChange={e=>setSort(e.target.value)}><option value="name">{t("ui.name.709a2")}</option><option value="state">{t("ui.state.a7250")}</option><option value="agents">{t("ui.ai.agents.2b51b")}</option></select></label></div>
-    <div className="fleet-grid">{visible.map(h=><button className="fleet-card g" key={h.host_id} onClick={()=>{selectHost(h.host_id);go("overview")}} aria-label={t("fleet.open", {host:h.host_id})}>
-      <span className="fleet-card-head"><strong>{h.host_id}</strong><span className={`fleet-state ${h.liveness}`}>{t(h.liveness === "live" ? "state.live" : h.liveness === "silent" ? "state.silent" : "state.offline")}</span></span>
-      <span className="fleet-labels">{Object.entries(h.labels||{}).map(([k,v])=><span key={k}>{k}: {v}</span>)}</span>
-      <span className="fleet-checks"><Ring good={h.normal} total={h.checks} /><span>{h.checks ? t("fleet.checks_normal", {good:h.normal, total:h.checks}) : t("fleet.no_checks")}</span></span>
-      <span className="fleet-metrics"><span>{t("ui.cpu.ff221")}{" "}<b>{formatPercent(h.cpu??null)}</b></span><span>{t("ui.memory.89c8a")}{" "}<b>{formatPercent(h.memory??null)}</b></span><span>{t("ui.disk.ef995")}{" "}<b>{formatPercent(h.disk??null)}</b></span><span>{t("ui.ai.agents.2b51b")}{" "}<b>{h.agents}</b></span></span>
-      <span className={`fleet-worst ${h.liveness==="live"?(h.worst_state||""):""}`}>{h.liveness==="live" ? h.worst||t("fleet.no_issues") : t("fleet.last_report", {at:h.at.startsWith("1970")?t("fleet.never"):resetTime(h.at)})}</span>
-    </button>)}</div>
+    <div className="fleet-controls terminal-filters"><TerminalFilter label={t("ui.label.74341")} choices={["all",...labels]} value={label} onChange={setLabel}/><TerminalFilter label={t("ui.state.a7250")} choices={["all","live","silent","offline"]} value={state} onChange={setState}/><TerminalFilter label={t("ui.sort.adc4e")} choices={["name","state","agents"]} value={sort} onChange={setSort}/></div>
+    <section className="g t"><div className="h"><h2>{t("ui.hosts.53103")}</h2></div><TerminalTable heads={[t("ui.host.3960e"),t("ui.state.a7250"),t("ui.cpu.ff221"),t("ui.memory.89c8a"),t("ui.disk.ef995"),t("ui.ai.agents.2b51b"),t("terminal.label_detail")]} right={[2,3,4,5]} rows={visible.map(h=>[<button className="terminal-link" onClick={()=>{selectHost(h.host_id);go("overview")}}>{h.host_id}</button>,h.liveness,formatPercent(h.cpu??null),formatPercent(h.memory??null),formatPercent(h.disk??null),String(h.agents),h.worst||"—"])}/></section>
     {visible.length===0?<Empty>{t("ui.no.hosts.match.these.filters.ab0a5")}</Empty>:null}
-    <div className="fleet-usage bento"><Tile title={t("ui.ai.usage.by.host.24.h.09bbd")} className="half">{hosts.map(h=><div className="fleet-usage-row" key={h.host_id}><span>{h.host_id}</span><b>{formatTokens(h.usage.reduce((n,u)=>n+total(u.tokens),0))}</b><small>{formatMoneyTotal(h.costs.filter(c=>c.method==="api_equivalent").map(costMoney))}</small></div>)}</Tile><Tile title={t("ui.ai.usage.by.project.24.h.eb6fa")} className="half">{[...projects].sort((a,b)=>b[1].tokens-a[1].tokens).map(([name,p])=><div className="fleet-usage-row" key={name}><span>{name}</span><b>{formatTokens(p.tokens)}</b><small>{formatMoneyTotal(p.costs.map(costMoney))}</small></div>)}</Tile></div>
+    <div className="fleet-usage bento"><Tile title={t("ui.ai.usage.by.host.24.h.09bbd")} className="half"><TerminalTable heads={[t("ui.host.3960e"),t("ui.tokens.c38c6"),t("ui.costs.799b3")]} right={[1,2]} rows={hosts.map(h=>[h.host_id,formatTokens(h.usage.reduce((n,u)=>n+total(u.tokens),0)),formatMoneyTotal(h.costs.filter(c=>c.method==="api_equivalent").map(costMoney))])}/></Tile><Tile title={t("ui.ai.usage.by.project.24.h.eb6fa")} className="half"><TerminalTable heads={[t("terminal.label_project"),t("ui.tokens.c38c6"),t("ui.costs.799b3")]} right={[1,2]} rows={[...projects].sort((a,b)=>b[1].tokens-a[1].tokens).map(([name,p])=>[name,formatTokens(p.tokens),formatMoneyTotal(p.costs.map(costMoney))])}/></Tile></div>
   </>;
 }
 function Palette({
@@ -1753,11 +1565,11 @@ function statusLabel(state: string): string {
   return t(state === "ok" ? "state.operational" : state === "warn" ? "state.degraded" : state === "crit" ? "state.down" : "state.unknown");
 }
 function DailyBars({days}:{days: ProbeDay[]}) {
-  return <div className="uptime-bars" role="img" aria-label={t("ui.daily.availability.for.30.days.5072a")}>
+  return <div className="terminal-daily-bars" role="img" aria-label={t("ui.daily.availability.for.30.days.5072a")}>
     {days.map(d=>{
       const elapsed = Math.min(86400,Math.max(0,(Date.now()-Date.parse(`${d.date}T00:00:00Z`))/1000));
       const note = coverageLabel(d.coverage,elapsed,"day");
-      return <span key={d.date} className={`uptime-day ${d.state}`} title={`${d.date}: ${uptimeLabel(d.uptime)}${note ? ` · ${note}` : ""}`} />;
+      return <span key={d.date} className={d.state==="crit"?"terminal-crit":d.state==="warn"?"terminal-warn":d.state==="unknown"?"terminal-dim":undefined} title={`${d.date}: ${uptimeLabel(d.uptime)}${note ? ` · ${note}` : ""}`}>{d.state==="unknown"?"░":"█"}</span>;
     })}
   </div>;
 }
@@ -1947,7 +1759,7 @@ function App() {
         <span className="terminal-window-title"><MonoMark/>{host || "fleetglass"} - fleetglass - {Math.max(40,Math.floor((typeof window !== "undefined" ? window.innerWidth : 1440)/7.5))}x{Math.max(20,Math.floor((typeof window !== "undefined" ? window.innerHeight : 900)/18))}</span>
       </div>
       <header className="top">
-        <div className="terminal-status"><MonoMark/><b>fleetglass {release?.version ?? ""}</b><span className="terminal-separator">│</span><label className="host">{t("ui.host.3960e")} <select aria-label={t("ui.host.3960e")} value={host} onChange={e=>setHost(e.target.value)}>{hosts.map(h=><option key={h.host_id} value={h.host_id}>{h.host_id}</option>)}</select></label><span className="terminal-separator">│</span><span>{t("terminal.status_up")} {t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_kernel")} {t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_load")} {value(result(data.overview?.results||[],"load"),"1m")?.toFixed(2) ?? t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{value(result(data.overview?.results||[],"cpu"),"core_count") ?? "—"} {t("terminal.label_threads")} · {value(result(data.overview?.results||[],"memory"),"total_bytes")===null?t("terminal.not_collected"):formatBytes(value(result(data.overview?.results||[],"memory"),"total_bytes"))}</span><span className="terminal-separator">│</span><span className="terminal-warn-count">{data.overview?.results.filter(x=>x.state==="warn").length ?? 0} WARN</span><span className="terminal-crit-count">{data.overview?.results.filter(x=>x.state==="crit").length ?? 0} CRIT</span><span>{data.stream === "stale" ? t("ui.connection.lost.62583") : stale ? t("ui.stale.data.2e635") : data.stream === "connecting" ? t("ui.connecting.c1f3b") : t("ui.live.65c82")}</span><span className="terminal-time">{new Date(tick).toLocaleString(preferences.language === "fr" ? "fr-FR" : "sv-SE",{dateStyle:"short",timeStyle:"medium",hour12:false})}</span>{protectedServer?<button type="button" className="quiet" onClick={signOut}>{t("ui.sign.out.dc164")}</button>:null}</div>
+        <div className="terminal-status"><MonoMark/><b>fleetglass {release?.version ?? ""}</b><span className="terminal-separator">│</span><span className="host"><TerminalFilter label={t("ui.host.3960e")} choices={hosts.map(h=>h.host_id)} value={host} onChange={setHost}/></span><span className="terminal-separator">│</span><span>{t("terminal.status_up")} {t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_kernel")} {t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_load")} {value(result(data.overview?.results||[],"load"),"1m")?.toFixed(2) ?? t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{value(result(data.overview?.results||[],"cpu"),"core_count") ?? "—"} {t("terminal.label_threads")} · {value(result(data.overview?.results||[],"memory"),"total_bytes")===null?t("terminal.not_collected"):formatBytes(value(result(data.overview?.results||[],"memory"),"total_bytes"))}</span><span className="terminal-separator">│</span><span className="terminal-warn-count">{data.overview?.results.filter(x=>x.state==="warn").length ?? 0} WARN</span><span className="terminal-crit-count">{data.overview?.results.filter(x=>x.state==="crit").length ?? 0} CRIT</span><span>{data.stream === "stale" ? t("ui.connection.lost.62583") : stale ? t("ui.stale.data.2e635") : data.stream === "connecting" ? t("ui.connecting.c1f3b") : t("ui.live.65c82")}</span><span className="terminal-time">{new Date(tick).toLocaleString(preferences.language === "fr" ? "fr-FR" : "sv-SE",{dateStyle:"short",timeStyle:"medium",hour12:false})}</span>{protectedServer?<button type="button" className="quiet" onClick={signOut}>{t("ui.sign.out.dc164")}</button>:null}</div>
         <div className="terminal-tabs"><nav className="tabs" aria-label={t("ui.views.24be6")}>{terminalViews.filter(v=>!preferences.hiddenTabs.includes(v)).map(v=>{const index=terminalViews.indexOf(v);return <button type="button" key={v} aria-pressed={view===v||(v==="machine"&&view==="storage")} onClick={()=>go(v)}>{index===9?0:index+1} {t(navigationLabels[v as keyof typeof navigationLabels], preferences.language).toLowerCase()}</button>})}<button type="button" className="terminal-search" onClick={()=>setPalette(true)} aria-label={t("ui.search.or.jump.to.commands.control.or.command.k.26860")} title={t("ui.search.or.jump.to.commands.ctrl.k.50228")}>{t("ui.k.64d86")}</button>{hosts.length>1?<button type="button" onClick={()=>go("fleet")}>{formatNumber(fleet.filter(h=>h.liveness==="live").length)} {t("ui.of.de04f")} {formatNumber(fleet.length)} {t("ui.hosts.reporting.57618")} · {formatNumber(fleet.filter(h=>h.liveness!=="live").length)} {t("ui.need.attention.c8806")} · {t("ui.view.fleet.8d8a0")}</button>:null}<button type="button" aria-pressed={view==="settings"} onClick={()=>go("settings")}>{t("ui.settings.c7f73",preferences.language).toLowerCase()}</button><button type="button" aria-pressed={view==="glossary"} onClick={()=>go("glossary")}>{t("terminal.glossary")}</button></nav><div className="terminal-range" role="group" aria-label={t("terminal.range")}>{t("terminal.range")} {(["1h","24h","7d","30d"] as Range[]).map(v=><button key={v} type="button" aria-pressed={range===v} onClick={()=>setRange(v)}>{v}</button>)}</div><div className="terminal-theme" role="group" aria-label={t("terminal.theme")}>{(["system","light","dark"] as const).map(mode=><button type="button" key={mode} aria-pressed={themeMode===mode} onClick={()=>setTheme(mode)}>{mode === "system" ? t("terminal.system") : mode === "light" ? t("terminal.light") : t("terminal.dark")}</button>)}</div></div>
       </header>
       {auth === "offline" ? (

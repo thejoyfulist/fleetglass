@@ -6,17 +6,20 @@ if __name__ == "__main__" and os.environ.get("FLEETGLASS_HEAVY_LOCK") and not os
     os.execvp("flock", ["flock", os.environ["FLEETGLASS_HEAVY_LOCK"], sys.executable, *sys.argv])
 
 import re
+import json
 import threading
 from pathlib import Path
 from http.server import ThreadingHTTPServer
+from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 import visual_check as fixture
 
 OUT = Path(__file__).resolve().parents[2] / "assets" / "screenshots"
 fixture.HOST_ID = "demo-01"
 fixture.RESULTS = [
-    fixture.result("cpu", {"busy_percent": 18, "core_count": 8}),
-    fixture.result("memory", {"used_bytes": 11 * 1024**3, "total_bytes": 32 * 1024**3, "swap_used_bytes": 0, "swap_total_bytes": 4 * 1024**3}),
+    fixture.result("cpu", {"busy_percent": 18, "core_count": 8, "user_percent": 11, "system_percent": 4, "iowait_percent": 2, "steal_percent": 1, "core_0_percent": 12, "core_1_percent": 24}),
+    fixture.result("load", {"1m": 0.82, "5m": 0.76, "15m": 0.69}),
+    fixture.result("memory", {"used_bytes": 11 * 1024**3, "total_bytes": 32 * 1024**3, "swap_used_bytes": 0, "swap_total_bytes": 4 * 1024**3, "page_cache_bytes": 4 * 1024**3, "buffers_bytes": 512 * 1024**2, "pressure_some_avg10": 0.4}),
     fixture.result("disk:/", {"used_bytes": 236 * 1024**3, "total_bytes": 1000 * 1024**3, "inodes_used": 82000, "inodes_total": 1000000}),
     fixture.result("cpu_package_power", {"watts": 22}),
     fixture.result("sensor:package", {"celsius": 48}),
@@ -24,6 +27,8 @@ fixture.RESULTS = [
     fixture.result("systemd:api", detail="active") | {"detail_code": "active"},
     fixture.result("systemd:worker", detail="active") | {"detail_code": "active"},
     fixture.result("network:eth0", {"rx_bytes_per_second": 28672, "tx_bytes_per_second": 12288, "rx_bytes": 8 * 1024**3, "tx_bytes": 4 * 1024**3}),
+    fixture.result("port:tcp:ipv4:3100:loopback", {"port": 3100}),
+    fixture.result("smart:0", {"wear_percent": 5, "media_errors": 0}, detail="disk health"),
     fixture.result("container:local:api", detail="healthy") | {"detail_code": "healthy"},
     fixture.result("container:local:worker", detail="healthy") | {"detail_code": "healthy"},
     fixture.result("container:local:cache", detail="healthy") | {"detail_code": "healthy"},
@@ -34,18 +39,20 @@ fixture.RESULTS = [
     fixture.result("security:failed_logins", {"count": 0}),
     fixture.result("security:sensitive_files", {"monitored": 4, "changes": 0}),
     fixture.result("backup:daily", {"count": 30, "age_seconds": 7200, "size_bytes": 840 * 1024**2}),
+    fixture.result("status:restore_test", {"age_seconds": 86400}, detail="recent timestamp"),
+    fixture.result("status:offsite_copy", {"age_seconds": 3600}, detail="recent timestamp"),
     fixture.result("internal:api", {"latency_ms": 24}, detail="TCP connect succeeded") | {"detail_code": "tcp_connect_succeeded", "fields": {"display_name": "API health"}},
 ]
 
 def session(number, kind, project, model, cpu, memory):
     return {"id": f"demo-session-{number}", "kind": kind, "project": project,
             "worktree": project, "user": "developer", "pid": 2400 + number,
-            "cpu_percent": cpu, "rss_bytes": memory * 1024**2, "at": fixture.iso(),
+            "cpu_percent": cpu, "rss_bytes": memory * 1024**2, "at": fixture.iso(), "started_at": fixture.iso(-5400),
             "state": "working", "reason": "", "source": "otel", "model": model}
 
-fixture.AGENTS = [session(1, "claude", "atlas", "Claude Sonnet", 7.2, 480),
-                  session(2, "codex", "orbit", "Codex", 5.1, 360),
-                  session(3, "claude", "ledger", "Claude Sonnet", 3.4, 410)]
+fixture.AGENTS = [session(1, "claude", "atlas", "claude-sonnet-4-5", 7.2, 480),
+                  session(2, "codex", "orbit", "gpt-6-sol", 5.1, 360),
+                  session(3, "claude", "ledger", "claude-sonnet-4-5", 3.4, 410)]
 fixture.USAGE = [
     {"name": name, "tokens": fixture.tokens(count), "hourly": [],
      "daily": [{"at": fixture.iso(-86400 * i), "tokens": fixture.tokens(round(count / 7))} for i in range(7)]}
@@ -56,6 +63,8 @@ fixture.QUOTAS = [
      "resets_at": fixture.iso(4 * 86400), "observed_at": fixture.iso(), "method": "cli_reported"},
     {"kind": "codex", "window": "primary", "used_percent": 26,
      "resets_at": fixture.iso(3 * 3600), "observed_at": fixture.iso(), "method": "cli_reported"},
+    {"kind": "claude", "window": "primary", "used_percent": 31,
+     "resets_at": fixture.iso(2 * 3600), "observed_at": fixture.iso(), "method": "estimated"},
 ]
 fixture.COSTS = [{"project": name, "method": "api_equivalent", "usd": amount,
                   "partial": False, "unpriced_tokens": 0}
@@ -73,6 +82,9 @@ fixture.APPS = [
                                     ("orbit", "agent", 5, 360),
                                     ("ledger", "agent", 3, 410))
 ]
+fixture.APPS.append({"name":"other", "kind":"other", "rates_ready":True, "cpu_percent":2,
+    "memory_bytes":128*1024**2, "page_cache_bytes":0, "disk_read_bytes_per_second":0,
+    "disk_write_bytes_per_second":0, "disk_read_bytes":0, "disk_write_bytes":0})
 fixture.WORKTREES = {
     "worktrees": [
         {"root": "/tmp/demo-workspaces", "project": name, "name": name,
@@ -98,7 +110,12 @@ fixture.OBSERVATIONS = {
          "stop_command": f"kill -TERM -- {3200 + i}", "started_at": fixture.iso(-7200)}
         for i, name in enumerate(("atlas", "orbit", "ledger"))
     ],
-    "insights": [], "heat": [], "storage": [],
+    "insights": [], "heat": [], "storage": [
+        {"root":"/tmp/demo-workspaces", "path":"atlas", "depth":0, "size_bytes":420*1024**2,
+         "complete":True, "growth_7d_bytes":12*1024**2, "at":fixture.iso()},
+        {"root":"/tmp/demo-workspaces", "path":"orbit", "depth":0, "size_bytes":310*1024**2,
+         "complete":True, "growth_7d_bytes":-8*1024**2, "at":fixture.iso()},
+    ],
 }
 fixture.PROBES = [{**fixture.PROBES[0], "name": "demo_site", "display_name": "Demo site",
                    "coverage_24h": 1, "coverage_7d": 1, "coverage_30d": 1,
@@ -108,15 +125,41 @@ fixture.PROBES = [{**fixture.PROBES[0], "name": "demo_site", "display_name": "De
 fixture.SERIES_BASES.update({"busy_percent": 16, "watts": 20, "used_bytes": 236 * 1024**3,
                              "celsius": 45, "cost": 2.3})
 
+class ShowcaseHandler(fixture.Handler):
+    def do_GET(self):
+        path = urlparse(self.path).path
+        if "/agents/demo-session-" in path:
+            index = int(path.rsplit("-",1)[-1])-1
+            session = fixture.AGENTS[index]
+            cost = (7.92,5.84,3.67)[index]
+            data = {"session":session,"tokens":fixture.USAGE[index]["tokens"],
+                    "usage_measured":True,"tokens_per_minute":720,
+                    "api_equivalent_usd":cost,"cli_reported_usd":0,
+                    "unpriced_tokens":0,"processes":[],"speed":[{
+                        **fixture.SPEED[0], "kind":session["kind"], "model":session["model"],
+                        "live_tokens_per_second":(15.2,42.5,13.8)[index],
+                    }]}
+            body = json.dumps(data).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+            return
+        if path == "/api/v1/fleet":
+            data = [{"host_id":"demo-01", "at":fixture.iso(), "liveness":"live",
+                     "normal":24, "checks":25, "cpu":18, "memory":34, "disk":24,
+                     "agents":3, "usage":fixture.USAGE, "costs":fixture.COSTS}]
+            body = json.dumps(data).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+            return
+        super().do_GET()
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    server = ThreadingHTTPServer(("127.0.0.1", 0), fixture.Handler)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), ShowcaseHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     base = f"http://127.0.0.1:{server.server_port}"
-    shots = (("overview", "light", 1440), ("overview", "dark", 1440),
-             ("agents", "light", 1440), ("apps", "light", 1440),
-             ("projects", "light", 1440), ("overview", "light", 390))
+    shots = tuple((view, theme, 1440) for view in ("overview", "agents", "apps", "projects") for theme in ("light", "dark")) + (("overview", "light", 390),)
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=True)

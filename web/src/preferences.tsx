@@ -4,6 +4,7 @@ import type { MessageKey } from "./i18n";
 import type { Language } from "./i18n";
 import type { Host, FleetHost, Overview } from "./data";
 import { formatBytes, formatDateTime, formatNumber, formatPercent, formatMoneyTotal, costMoney, value, result } from "./data";
+import { TerminalFilter } from "./terminal";
 
 export type { Language } from "./i18n";
 export type Preferences = {
@@ -172,66 +173,11 @@ export function SettingsView({
           <div className="h">
             <h2>{t("ui.display.574ff",lang)}</h2>
           </div>
-          <label>
-            {t("ui.language.89b86",lang)}
-            <select
-              value={lang}
-              onChange={(e) => update("language", e.target.value as Language)}
-            >
-              <option value="en">{t("ui.english.649df")}</option>
-              <option value="fr">{t("ui.francais.2ca51")}</option>
-            </select>
-          </label>
-          <label>
-            {lang === "fr" ? "Devise des coûts" : "Cost currency"}
-            <select value={preferences.currency} onChange={(e) => update("currency", e.target.value)}>
-              <option value="USD">USD</option><option value="EUR">EUR</option>
-            </select>
-          </label>
-          <label>
-            {t("ui.temperature.0a906",lang)}
-            <select
-              value={preferences.temperature}
-              onChange={(e) =>
-                update("temperature", e.target.value as "C" | "F")
-              }
-            >
-              <option value="C">{t("ui.c.a1786")}</option>
-              <option value="F">{t("ui.f.770df")}</option>
-            </select>
-          </label>
-          <label>
-            {t("ui.network.rate.e2691",lang)}
-            <select
-              value={preferences.network}
-              onChange={(e) =>
-                update("network", e.target.value as "bytes" | "bits")
-              }
-            >
-              <option value="bytes">
-                {t("ui.bytes.s.83742",lang)}
-              </option>
-              <option value="bits">
-                {t("ui.bits.s.b4084",lang)}
-              </option>
-            </select>
-          </label>
-          <label>
-            {t("ui.cpu.usage.d52b4",lang)}
-            <select
-              value={preferences.cpu}
-              onChange={(e) =>
-                update("cpu", e.target.value as "core" | "machine")
-              }
-            >
-              <option value="core">
-                {t("ui.per.core.a21e9",lang)}
-              </option>
-              <option value="machine">
-                {t("ui.whole.machine.b25ff",lang)}
-              </option>
-            </select>
-          </label>
+          <TerminalFilter label={t("ui.language.89b86",lang)} choices={["en","fr"]} value={lang} onChange={v=>update("language",v as Language)}/>
+          <TerminalFilter label={lang==="fr"?"Devise des coûts":"Cost currency"} choices={["USD","EUR"]} value={preferences.currency} onChange={v=>update("currency",v)}/>
+          <TerminalFilter label={t("ui.temperature.0a906",lang)} choices={["C","F"]} value={preferences.temperature} onChange={v=>update("temperature",v as "C"|"F")}/>
+          <TerminalFilter label={t("ui.network.rate.e2691",lang)} choices={["bytes","bits"]} value={preferences.network} onChange={v=>update("network",v as "bytes"|"bits")}/>
+          <TerminalFilter label={t("ui.cpu.usage.d52b4",lang)} choices={["core","machine"]} value={preferences.cpu} onChange={v=>update("cpu",v as "core"|"machine")}/>
         </section>
         <section className="g t">
           <div className="h">
@@ -288,18 +234,6 @@ export function SettingsView({
     </>
   );
 }
-function roundRect(
-  c: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-) {
-  c.beginPath();
-  c.roundRect(x, y, w, h, r);
-  c.fill();
-}
 export function ShareView({
   host,
   hosts,
@@ -327,30 +261,34 @@ export function ShareView({
     const c = canvas.getContext("2d");
     if (!c) return;
     const dark = cardTheme === "dark";
-    const bg = dark ? "#0A0D14" : "#F5F6F8",
-      ink = dark ? "#E6EAF2" : "#0B1220",
-      muted = dark ? "#A3ADBF" : "#475467",
-      tile = dark ? "#1B2130" : "#FFFFFF";
+    const bg = dark ? "#1E1E1E" : "#FFFFFF",
+      ink = dark ? "#E5E5E5" : "#000000",
+      muted = dark ? "#8C8C8C" : "#666666",
+      line = dark ? "#444444" : "#BFBFBF";
     c.fillStyle = bg;
     c.fillRect(0, 0, 1200, 630);
-    const grad = c.createLinearGradient(0, 0, 1200, 630);
-    grad.addColorStop(0, dark ? "#6E8BFF" : "#2F5BEA");
-    grad.addColorStop(1, dark ? "#2DC4D6" : "#13A5B8");
-    c.fillStyle = grad;
-    c.fillRect(0, 0, 1200, 8);
+    c.fillStyle = dark ? "#2B2B2B" : "#E8E8E8";
+    c.fillRect(0, 0, 1200, 42);
+    for (const [index,color] of ["#FF5F57","#FEBC2E","#28C840"].entries()) {
+      c.beginPath(); c.arc(22+index*23,21,7,0,Math.PI*2); c.fillStyle=color; c.fill();
+    }
     c.fillStyle = ink;
-    c.font = "600 34px Geist, sans-serif";
-    c.fillText("Fleetglass", 68, 84);
+    c.font = "22px Menlo, Monaco, monospace";
+    c.textAlign = "center";
+    c.fillText("fleetglass - 120x63", 600, 29);
+    c.textAlign = "left";
+    c.font = "bold 24px Menlo, Monaco, monospace";
+    c.fillText("fleetglass", 40, 94);
     c.fillStyle = muted;
-    c.font = "22px Geist, sans-serif";
+    c.font = "20px Menlo, Monaco, monospace";
     c.fillText(
       scope === "fleet"
         ? t("ui.fleet.summary.52086",language)
         : hide
           ? t("ui.private.host.fd00f",language)
           : host,
-      68,
-      137,
+      40,
+      135,
     );
     const boxes: [string, string][] =
       scope === "fleet"
@@ -389,26 +327,28 @@ export function ShareView({
             ],
           ];
     boxes.forEach(([label, num], i) => {
-      c.fillStyle = tile;
-      roundRect(c, 68 + i * 361, 206, 334, 245, 22);
+      const x = 40+i*373;
+      c.strokeStyle = line;
+      c.lineWidth = 1;
+      c.strokeRect(x, 185, 350, 250);
       c.fillStyle = muted;
-      c.font = "22px Geist, sans-serif";
-      c.fillText(label, 94 + i * 361, 258);
+      c.font = "19px Menlo, Monaco, monospace";
+      c.fillText(label, x+22, 235);
       c.fillStyle = ink;
-      c.font = "600 58px Geist, sans-serif";
-      c.fillText(num, 94 + i * 361, 365);
+      c.font = "bold 48px Menlo, Monaco, monospace";
+      c.fillText(num, x+22, 335);
     });
     c.fillStyle = muted;
-    c.font = "18px Geist, sans-serif";
+    c.font = "18px Menlo, Monaco, monospace";
     c.fillText(
       `${t("ui.measured.95503",language)} ${formatDateTime(overview?.at || Date.now(), language)}`,
-      68,
-      536,
+      40,
+      520,
     );
-    c.fillText("fleetglass", 68, 578);
+    c.fillText("fleetglass", 40, 575);
     const costs = (scope === "fleet" ? fleet : fleet.filter(x => x.host_id === host)).flatMap(x => x.costs.filter(cost => cost.method === "api_equivalent").map(costMoney));
     c.textAlign = "right";
-    c.fillText(`${language === "fr" ? "Équivalent API" : "API equivalent"} · ${formatMoneyTotal(costs)}`, 1130, 578);
+    c.fillText(`${language === "fr" ? "Équivalent API" : "API equivalent"} · ${formatMoneyTotal(costs)}`, 1160, 575);
     c.textAlign = "left";
     setUrl(canvas.toDataURL("image/png"));
   }, [host, hosts, fleet, overview, scope, hide, cardTheme, language]);
@@ -434,30 +374,8 @@ export function ShareView({
           <div className="h">
             <h2>{t("ui.card.4d4ce",language)}</h2>
           </div>
-          <label>
-            {t("ui.content.4f9be",language)}
-            <select
-              value={scope}
-              onChange={(e) => setScope(e.target.value as "host" | "fleet")}
-            >
-              <option value="host">
-                {t("ui.host.3960e",language)}
-              </option>
-              <option value="fleet">
-                {t("ui.fleet.e1991",language)}
-              </option>
-            </select>
-          </label>
-          <label>
-            {t("ui.theme.a797e", language)}
-            <select
-              value={cardTheme}
-              onChange={(e) => setCardTheme(e.target.value as "light" | "dark")}
-            >
-              <option value="light">{t("ui.light.a36ef", language)}</option>
-              <option value="dark">{t("ui.dark.ae1ef", language)}</option>
-            </select>
-          </label>
+          <TerminalFilter label={t("ui.content.4f9be",language)} choices={["host","fleet"]} value={scope} onChange={v=>setScope(v as "host"|"fleet")}/>
+          <TerminalFilter label={t("ui.theme.a797e",language)} choices={["light","dark"]} value={cardTheme} onChange={v=>setCardTheme(v as "light"|"dark")}/>
           <label className="check">
             <input
               type="checkbox"

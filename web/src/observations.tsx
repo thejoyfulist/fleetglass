@@ -1,8 +1,9 @@
 import { plural, t } from "./i18n";
 import type { MessageKey } from "./i18n";
 import { useState } from "react";
+import { TerminalTable, TerminalBar } from "./terminal";
 import { formatAppCPU } from "./preferences";
-import { agentName, formatBytes, formatDateTime, formatDuration, hasDate, resetTime } from "./data";
+import { formatBytes, formatDateTime, formatDuration, hasDate, resetTime } from "./data";
 import type { Insight, Observations, ProjectProcess, WorktreesView } from "./data";
 
 const insightMessages: Record<string, MessageKey> = {
@@ -57,13 +58,6 @@ export function InsightsPanel({
       ) : null}
     </section>
   );
-}
-function processLabel(p: ProjectProcess) {
-  return p.kind === "dev_server"
-    ? t("ui.dev.server.df14a")
-    : p.kind === "agent"
-      ? t("ui.ai.agent.ab15e")
-      : t("ui.process.12f4c");
 }
 export function ProjectsView({
   data,
@@ -127,65 +121,9 @@ export function ProjectsView({
         </section>
         <InsightsPanel insights={data.insights} />
       </div>
-      {groups.size ? (
-        [...groups].map(([key, processes]) => (
-          <section className="g observation-project" key={key}>
-            <div className="h">
-              <h2>{key}</h2>
-              <span className="src">
-                {plural(processes.length, "project.process.one", "project.process.many")}
-              </span>
-            </div>
-            <div className="observation-processes">
-              {processes.map((p) => (
-                <div className="observation-process" key={p.pid}>
-                  <div>
-                    <strong>{p.name}</strong>
-                    <small>
-                      {processLabel(p)} {" "}{t("ui.pid.08323")}{" "}{p.pid}
-                      {p.left_behind ? ` · ${t("project.left_by",{agent:p.agent_kind?agentName(p.agent_kind):t("value.unknown"),session:(p.agent_session_id||"").slice(0,8)})}` : ""}
-                      {hasDate(p.started_at) ? ` · ${formatDuration(Math.max(0,(Date.now()-new Date(p.started_at).getTime())/1000))}` : ""}
-                      {p.agent_session_id?<a href={`/agents?session=${encodeURIComponent(p.agent_session_id)}`}>{t("session.open")}</a>:null}
-                      {p.idle
-                        ? ` · ${t("project.idle_age", {minutes: Math.floor(p.idle_minutes)})}`
-                        : ""}
-                    </small>
-                  </div>
-                  <div>
-                    <b>{formatAppCPU(p.cpu_percent)} {" "}{t("ui.cpu.ff221")}</b>
-                    <small>{formatBytes(p.memory_bytes)} {" "}{t("ui.ram.ac698")}</small>
-                  </div>
-                  <div>
-                    <b>
-                      {!p.ports_measured
-                        ? t("ui.ports.not.measured.d4001")
-                        : p.ports.length
-                          ? p.ports.map((x) => `:${x}`).join(", ")
-                          : t("ui.no.listening.port.b2a83")}
-                    </b>
-                    <small>{p.worktree || p.project}</small>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void copy(p)}
-                    aria-label={t("project.copy_command_for", {name: p.name, pid: p.pid})}
-                  >
-                    {copied === p.pid ? t("ui.copied.8e3df") : t("ui.copy.stop.command.e9e3a")}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        ))
-      ) : (
-        <section className="g t">
-          <h2>{t("ui.no.project.processes.found.c00d6")}</h2>
-          <p className="foot">
-            {" "}{t("ui.configure.project.roots.and.worktree.roots.in.th.edda4")}{" "}</p>
-        </section>
-      )}
+      {[...groups].map(([key,processes])=><section className="g t observation-project" key={key}><div className="h"><h2>{key}</h2><span className="src">{plural(processes.length,"project.process.one","project.process.many")}</span></div><TerminalTable heads={[t("terminal.label_process"),t("ui.cpu.ff221"),t("terminal.label_mem"),t("terminal.label_port"),t("terminal.label_idle"),t("ui.state.a7250")]} right={[1,2,3,4]} rows={processes.map(p=>[p.agent_session_id?<a href={`/agents?session=${encodeURIComponent(p.agent_session_id)}`}>{p.name}</a>:p.name,formatAppCPU(p.cpu_percent),formatBytes(p.memory_bytes),p.ports_measured?p.ports.map(x=>`:${x}`).join(", "):t("ui.ports.not.measured.d4001"),p.idle?`${Math.floor(p.idle_minutes)}m`:"—",<button type="button" className="terminal-link" onClick={()=>void copy(p)} aria-label={t("project.copy_command_for",{name:p.name,pid:p.pid})}>{copied===p.pid?t("ui.copied.8e3df"):t("ui.copy.stop.command.e9e3a")}</button>])}/></section>)}
       <section className="g t observation-project"><div className="h"><h2>{t("worktree.title")}</h2><span className="src">{worktrees.at?formatDateTime(worktrees.at):t("value.unknown")}</span></div><p>{t("worktree.reclaimable",{size:formatBytes(worktrees.reclaimable_bytes)})}</p>
-        {worktrees.worktrees.length?<div className="worktree-list"><div className="worktree-row worktree-heading"><span>{t("worktree.title")}</span><span>{t("ui.size.b7152")}</span><span>{t("worktree.age_label")}</span><span>{t("worktree.last_commit")}</span><span>{t("worktree.merge_status")}</span><span>{t("ui.agents.64acf")}</span><span>{t("ui.state.a7250")}</span></div>{worktrees.worktrees.map(tree=><div className="worktree-row" key={tree.path}><strong>{tree.project} / {tree.name}</strong><span>{tree.size_complete?formatBytes(tree.size_bytes):t("worktree.incomplete")}</span><span>{hasDate(tree.created_at)?t("worktree.age",{age:formatDuration(Math.max(0,(Date.now()-new Date(tree.created_at).getTime())/1000))}):t("value.unknown")}</span><span>{hasDate(tree.last_commit_at)?formatDateTime(tree.last_commit_at):t("value.unknown")}</span><span>{tree.merged===undefined?t("worktree.merge_unknown"):tree.merged?t("worktree.merged"):t("worktree.unmerged")}</span><span>{t("worktree.processes",{count:tree.agent_processes})}</span><span>{tree.stale?t("worktree.stale"):tree.reclaimable?t("worktree.reclaimable_tag"):""}</span></div>)}</div>:<p>{t("worktree.no_data")}</p>}
+        <TerminalTable heads={[t("worktree.title"),t("ui.size.b7152"),t("worktree.age_label"),t("worktree.last_commit"),t("worktree.merge_status"),t("ui.agents.64acf"),t("ui.state.a7250")]} right={[1,2,5]} rows={worktrees.worktrees.map(tree=>[`${tree.project} / ${tree.name}`,tree.size_complete?formatBytes(tree.size_bytes):t("worktree.incomplete"),hasDate(tree.created_at)?formatDuration(Math.max(0,(Date.now()-new Date(tree.created_at).getTime())/1000)):"—",hasDate(tree.last_commit_at)?formatDateTime(tree.last_commit_at):"—",tree.merged===undefined?t("worktree.merge_unknown"):tree.merged?t("worktree.merged"):t("worktree.unmerged"),String(tree.agent_processes),tree.stale?t("worktree.stale"):tree.reclaimable?t("worktree.reclaimable_tag"):"—"])}/>
       </section>
     </>
   );
@@ -214,32 +152,12 @@ export function StorageView({ data }: { data: Observations }) {
                   {entries[0] ? resetTime(entries[0].at) : t("ui.waiting.33d30")}
                 </span>
               </div>
-              <div className="storage-heading">
-                <span>{t("ui.directory.4b892")}</span>
-                <span>{t("ui.size.b7152")}</span>
-                <span>{t("ui.7.d.growth.36d43")}</span>
-              </div>
-              {entries.map((e) => (
-                <div className="storage-row" key={e.path}>
-                  <div
-                    className="storage-path"
-                    style={{ paddingInlineStart: `${e.depth * 12}px` }}
-                  >
-                    <strong>{e.path}</strong>
-                    <i style={{ width: `${(100 * e.size_bytes) / max}%` }} />
-                  </div>
-                  <span>
-                    {e.complete
-                      ? formatBytes(e.size_bytes)
-                      : t("storage.partial")}
-                  </span>
-                  <span>
-                    {e.growth_7d_bytes === undefined
-                      ? t("storage.waiting_growth")
-                      : `${e.growth_7d_bytes >= 0 ? "+" : "−"}${formatBytes(Math.abs(e.growth_7d_bytes))}`}
-                  </span>
-                </div>
-              ))}
+              <TerminalTable heads={[t("ui.directory.4b892"),t("ui.size.b7152"),t("ui.7.d.growth.36d43"),t("terminal.label_used")]} right={[1,2]} rows={entries.map(e=>[
+                `${"  ".repeat(e.depth)}${e.path}`,
+                e.complete?formatBytes(e.size_bytes):t("storage.partial"),
+                e.growth_7d_bytes===undefined?t("storage.waiting_growth"):`${e.growth_7d_bytes>=0?"+":"−"}${formatBytes(Math.abs(e.growth_7d_bytes))}`,
+                <TerminalBar percent={100*e.size_bytes/max} width={10}/>,
+              ])}/>
               <p className="foot">
                 {" "}{t("ui.directory.totals.include.descendants.symbolic.li.373ca")}{" "}</p>
             </section>

@@ -128,7 +128,7 @@ class Handler(SimpleHTTPRequestHandler):
             elif path.endswith("/ai/usage"):
                 by = q.get("by", ["project"])[0]
                 if by == "session": data = [{**usage,"name":agent["id"]} for usage,agent in zip(USAGE,AGENTS)]
-                elif by == "model": data = [{**USAGE[0],"name":"Claude Sonnet"},{**USAGE[1],"name":"Codex"}]
+                elif by == "model": data = [{**usage,"name":agent["model"]} for usage,agent in zip(USAGE,AGENTS)]
                 else: data = USAGE
             elif path.endswith("/series") or path.endswith("/ai/cost-series"):
                 metric = q.get("metric", ["cost"])[0]

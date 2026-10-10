@@ -67,9 +67,26 @@ export const messages = {
   "terminal.label_unit": ["unit", "unité"],
   "terminal.label_updates": ["updates", "mises à jour"],
   "terminal.label_used": ["used", "utilisé"],
+  "terminal.label_value": ["value", "valeur"],
+  "terminal.label_in": ["in", "entrée"],
+  "terminal.label_out": ["out", "sortie"],
+  "terminal.label_cache_tokens": ["cache", "cache"],
+  "terminal.label_tokens_second": ["tok/s", "jetons/s"],
+  "terminal.label_tokens_minute": ["tok/min", "jetons/min"],
+  "terminal.label_requests_minute": ["req/min", "requêtes/min"],
+  "terminal.label_median": ["median", "médiane"],
+  "terminal.label_p95": ["p95", "p95"],
+  "terminal.label_errors": ["errors", "erreurs"],
+  "terminal.label_retries": ["retries", "tentatives"],
+  "terminal.label_page_cache": ["page cache", "cache de pages"],
   "terminal.label_user_sys": ["user/sys", "utilisateur/système"],
   "terminal.label_window": ["window", "fenêtre"],
   "terminal.not_collected": ["not collected", "non collecté"],
+  "terminal.monthly": ["monthly", "mensuel"],
+  "terminal.api_used": ["API used", "API utilisé"],
+  "terminal.value_ratio": ["value ratio", "rapport valeur"],
+  "terminal.speed": ["speed", "vitesse"],
+  "terminal.pace": ["pace", "rythme"],
   "terminal.collected": ["collected", "collectés"],
   "terminal.top_memory": ["top by RSS", "premiers par RSS"],
   "terminal.attention": ["attention", "à surveiller"],
@@ -87,6 +104,7 @@ export const messages = {
   "terminal.range": ["range", "période"],
   "terminal.views": ["views", "vues"],
   "terminal.filter": ["filter", "filtrer"],
+  "terminal.search": ["search", "rechercher"],
   "terminal.theme": ["theme", "thème"],
   "terminal.glossary": ["glossary", "glossaire"],
   "terminal.system": ["system", "système"],
@@ -116,24 +134,18 @@ export const messages = {
   "worktree.merge_status": ["Merge", "Fusion"],
   "worktree.reclaimable": ["{size} in merged idle worktrees could be reclaimed", "{size} pourraient être récupérés dans les arbres fusionnés et inactifs"],
   "worktree.incomplete": ["Size incomplete", "Taille incomplète"],
-  "worktree.age": ["Age ≈ {age}", "Âge ≈ {age}"],
   "worktree.merge_unknown": ["Merge unknown", "Fusion inconnue"],
   "worktree.merged": ["Merged", "Fusionné"],
   "worktree.unmerged": ["Not merged", "Non fusionné"],
-  "worktree.processes": ["{count} agent processes", "{count} processus d’agent"],
   "worktree.stale": ["Stale by the 72 h rule", "Ancien selon la règle des 72 h"],
   "worktree.reclaimable_tag": ["Reclaimable", "Récupérable"],
-  "worktree.no_data": ["No worktrees reported", "Aucun arbre de travail signalé"],
-  "session.open": ["Session card", "Fiche de session"],
   "session.title": ["{agent} session", "Session {agent}"],
   "session.start": ["Start", "Début"],
   "session.end": ["End", "Fin"],
   "session.running": ["Running", "En cours"],
   "session.duration": ["Duration", "Durée"],
-  "session.peak": ["peak observed", "pic observé"],
   "session.spawned": ["Spawned processes", "Processus lancés"],
   "session.no_spawned": ["No spawned processes observed", "Aucun processus lancé observé"],
-  "session.tokens_rate": ["{tokens} · {rate}/min", "{tokens} · {rate} par min"],
   "quota.advice_ahead": ["{agent} is ahead of pace on {window} ({used}); projected limit {projected}", "{agent} dépasse le rythme sur {window} ({used}) ; limite prévue le {projected}"],
   "quota.room": ["{agent} has room on {window} ({used}); projected limit {projected}", "{agent} a de la marge sur {window} ({used}) ; limite prévue le {projected}"],
   "quota.no_projection": ["{agent} on {window} ({used}): {pace}; limit time unavailable", "{agent} sur {window} ({used}) : {pace} ; heure de limite indisponible"],
@@ -141,27 +153,15 @@ export const messages = {
   "project.witnessed_ancestry": ["Witnessed process tree", "Arbre de processus observé"],
   "project.freeable": ["Estimated freeable process RSS: {memory}", "Mémoire RSS potentiellement libérable (estimation) : {memory}"],
   "project.copy_only": ["Review the process before copying a stop command. Fleetglass takes no action.", "Examinez le processus avant de copier une commande d’arrêt. Fleetglass n’agit pas."],
-  "project.left_by": ["left behind by {agent} session {session}", "laissé par la session {agent} {session}"],
   "subscription.title": ["Subscription versus API", "Abonnement face à l’API"],
   "subscription.this_month": ["Current calendar month", "Mois en cours"],
   "subscription.api_equivalent": ["API equivalent at configured model prices", "Équivalent API aux tarifs des modèles configurés"],
-  "subscription.configure": ["Add your subscription amount in the configuration to compare costs", "Ajoutez le montant de votre abonnement dans la configuration pour comparer les coûts"],
-  "subscription.comparison": ["against a {amount} monthly subscription", "pour un abonnement mensuel de {amount}"],
   "subscription.no_config_foot": ["API equivalent is an estimate, not a bill.", "L’équivalent API est une estimation, pas une facture."],
   "speed.title": ["Speed", "Vitesse"],
   "speed.one_hour": ["1 h", "1 h"],
   "speed.day": ["24 h", "24 h"],
   "speed.last_hour": ["Last hour", "Dernière heure"],
   "speed.no_data": ["No speed measurements yet", "Aucune mesure de vitesse pour le moment"],
-  "speed.estimated": ["Estimated from logs", "Estimation à partir des journaux"],
-  "speed.unmeasured": ["Speed not measured", "Vitesse non mesurée"],
-  "speed.otlp": ["OpenTelemetry", "OpenTelemetry"],
-  "speed.tokens_second": ["output tokens/s", "jetons de sortie/s"],
-  "speed.live": ["live", "en direct"],
-  "speed.median": ["median", "médiane"],
-  "speed.median_p95": ["Median {median} · p95 {p95}", "Médiane {median} · p95 {p95}"],
-  "speed.request_metrics": ["Request {duration} · first token {first}", "Requête {duration} · premier jeton {first}"],
-  "speed.activity": ["{tokens} tokens/min · {requests} requests/min · {errors} errors · {retries} retries", "{tokens} jetons/min · {requests} requêtes/min · {errors} erreurs · {retries} tentatives"],
   "pwa.offline": ["Offline", "Hors connexion"],
   "pwa.last_data": ["Last data at {at}", "Dernières données le {at}"],
   "result.certificate_expires": ["Expires in {days} days", "Expire dans {days} jours"],
@@ -202,8 +202,6 @@ export const messages = {
   "explain.api": ["An estimate of what the same AI usage would cost at API rates. It is not an invoice or your subscription charge.","Estimation du coût de la même utilisation aux tarifs de l’API. Ce n’est ni une facture ni le montant de votre abonnement."],
   "explain.coverage": ["The share of the period with valid observations. Missing observations are not counted as healthy.","Part de la période couverte par des mesures valides. Les périodes sans mesure ne sont pas considérées comme saines."],
   "ui.what.this.means.a4bcc": ["What this means","Comprendre"],
-  "ui.bytes.s.83742": ["Bytes/s","Octets/s"],
-  "ui.bits.s.b4084": ["Bits/s","Bits/s"],
   "ui.fleet.summary.52086": ["Fleet summary","Vue du parc"],
   "ui.private.host.fd00f": ["Private host","Hôte privé"],
   "ui.reporting.c9e57": ["Reporting","En ligne"],
@@ -279,9 +277,6 @@ export const messages = {
   "state.degraded": ["Degraded", "Dégradé"],
   "state.down": ["Down", "En panne"],
   "state.unknown": ["Unknown", "Inconnu"],
-  "state.live": ["Live", "En direct"],
-  "state.silent": ["Silent", "Silencieux"],
-  "state.offline": ["Offline", "Hors ligne"],
   "coverage.none": ["No measurements in {period}", "Aucune mesure sur {period}"],
   "coverage.measured": ["Measured {duration} of {period}", "{duration} de mesures sur {period}"],
   "coverage.less_than_minute": ["less than 1 min", "moins de 1 min"],
@@ -295,12 +290,6 @@ export const messages = {
   "public.all_operational": ["All systems operational", "Tous les services fonctionnent"],
   "public.unavailable": ["Status is temporarily unavailable.", "L’état des services est temporairement indisponible."],
   "fleet.summary": ["{hosts} hosts · {live} live · {silent} silent · {offline} offline", "{hosts} hôtes · {live} en direct · {silent} silencieux · {offline} hors ligne"],
-  "fleet.open": ["Open {host} cockpit", "Ouvrir le tableau de bord de {host}"],
-  "fleet.checks_normal": ["{good} of {total} checks normal", "{good} contrôles normaux sur {total}"],
-  "fleet.no_checks": ["No current checks", "Aucun contrôle récent"],
-  "fleet.no_issues": ["No issues reported", "Aucune anomalie signalée"],
-  "fleet.last_report": ["Last report {at}", "Dernier rapport {at}"],
-  "fleet.never": ["never", "jamais"],
 
   "machine.memory_used": ["Memory used", "Mémoire utilisée"],
   "machine.memory_total": ["Memory total", "Mémoire totale"],
@@ -344,14 +333,10 @@ export const messages = {
   "app.show_12h": ["Show 12 h", "Afficher 12 h"],
   "app.show_48h": ["Show 48 h", "Afficher 48 h"],
   "app.details": ["{name} details", "Détails de {name}"],
-  "app.share": ["{metric} share {amount}", "Part de {metric} : {amount}"],
-  "app.not_measured": ["not measured", "non mesuré"],
-  "app.host_counters": ["host counters", "compteurs de l’hôte"],
   "project.idle.one": ["{count} idle server", "{count} serveur inactif"],
   "project.idle.many": ["{count} idle servers", "{count} serveurs inactifs"],
   "project.process.one": ["{count} process", "{count} processus"],
   "project.process.many": ["{count} processes", "{count} processus"],
-  "project.idle_age": ["idle {minutes} min", "inactif depuis {minutes} min"],
   "project.copy_command_for": ["Copy stop command for {name}, PID {pid}", "Copier la commande d’arrêt de {name}, PID {pid}"],
   "project.none": ["none", "aucun"],
   "storage.partial": ["Partial / unreadable", "Partiel / illisible"],
@@ -375,11 +360,7 @@ export const messages = {
   "ui.stale.data.2e635": ["Stale data","Données anciennes"],
   "ui.connecting.c1f3b": ["Connecting","Connexion"],
   "ui.live.65c82": ["Live","En direct"],
-  "ui.dev.server.df14a": ["Dev server","Serveur de développement"],
-  "ui.ai.agent.ab15e": ["AI agent","Agent IA"],
-  "ui.process.12f4c": ["Process","Processus"],
   "ui.ports.not.measured.d4001": ["Ports not measured","Ports non mesurés"],
-  "ui.no.listening.port.b2a83": ["No listening port","Aucun port en écoute"],
   "ui.copied.8e3df": ["Copied","Copiée"],
   "ui.copy.stop.command.e9e3a": ["Copy stop command","Copier la commande d’arrêt"],
   "ui.preferences.saved.in.this.browser.8c56a": ["Preferences saved in this browser.","Préférences enregistrées dans ce navigateur."],
@@ -388,8 +369,6 @@ export const messages = {
   "ui.temperature.0a906": ["Temperature","Température"],
   "ui.network.rate.e2691": ["Network rate","Débit réseau"],
   "ui.cpu.usage.d52b4": ["CPU usage","Usage du processeur"],
-  "ui.per.core.a21e9": ["Per core","Par cœur"],
-  "ui.whole.machine.b25ff": ["Whole machine","Machine entière"],
   "ui.navigation.cf03c": ["Navigation","Navigation"],
   "ui.choose.visible.tabs.settings.always.remains.avai.6bae1": ["Choose visible tabs. Settings always remains available.","Choisissez les onglets visibles. Réglages reste toujours accessible."],
   "ui.sections.7ff5a": ["Sections","Sections"],
@@ -442,9 +421,7 @@ export const messages = {
   "observation.closed_target": ["Closed target", "Cible fermée"],
   "observation.offsite_copy": ["Offsite copy", "Copie hors site"],
   "observation.check": ["Unnamed check", "Sonde sans nom"],
-  "value.unknown_worktree": ["Unknown worktree", "Arbre de travail inconnu"],
   "value.unknown_model": ["Unknown model", "Modèle inconnu"],
-  "value.unknown_user": ["unknown user", "utilisateur inconnu"],
   "value.no_reason": ["No reason reported", "Aucun motif signalé"],
 
   "ui.project.worktree.cbe27": ["Project / worktree","Projet / arbre de travail"],
@@ -520,7 +497,6 @@ export const messages = {
   "status.stale_count.many": ["{count} stale", "{count} anciens"],
   "status.agent_count.one": ["{count} AI agent", "{count} agent IA"],
   "status.agent_count.many": ["{count} AI agents", "{count} agents IA"],
-  "agent.session_count": ["{count} sessions", "{count} sessions"],
   "insight.cpu": ["CPU above 80% of one core for 10 minutes", "Processeur au-dessus de 80 % d’un cœur pendant 10 minutes"],
   "insight.disk": ["Disk writes above 10 MiB/s for 15 minutes", "Écritures disque au-dessus de 10 Mio/s pendant 15 minutes"],
   "insight.network": ["Network traffic above 10 MiB/s for 15 minutes", "Trafic réseau au-dessus de 10 Mio/s pendant 15 minutes"],
@@ -796,14 +772,6 @@ export const messages = {
     "Resource owners",
     "Responsables des ressources"
   ],
-  "ui.search.apps.ca3ce": [
-    "Search apps",
-    "Rechercher des applications"
-  ],
-  "ui.app.name.c877c": [
-    "App name",
-    "Nom de l’application"
-  ],
   "ui.type.3deb7": [
     "Type",
     "Type"
@@ -834,14 +802,6 @@ export const messages = {
     "Share",
     "Partager"
   ],
-  "ui.app.list.scroll.for.more.421e6": [
-    "App list, scroll for more",
-    "Liste des applications, faire défiler pour en voir plus"
-  ],
-  "ui.app.accounting.will.appear.after.the.agent.sends.e5bf7": [
-    "App accounting will appear after the agent sends two samples.",
-    "La répartition par application apparaîtra après deux mesures de l’agent."
-  ],
   "ui.no.apps.match.this.search.or.type.584a6": [
     "No apps match this search or type.",
     "Aucune application ne correspond à cette recherche ou à ce type."
@@ -854,29 +814,9 @@ export const messages = {
     "Processes",
     "Processus"
   ],
-  "ui.pid.dde57": [
-    "PID",
-    "PID"
-  ],
-  "ui.process.names.and.pids.will.appear.with.the.next.50811": [
-    "Process names and PIDs will appear with the next agent sample.",
-    "Les noms et identifiants des processus apparaîtront à la prochaine mesure de l’agent."
-  ],
-  "ui.resource.history.4c4b5": [
-    "Resource history",
-    "Historique des ressources"
-  ],
   "ui.disk.today.6bb6e": [
     "Disk today:",
     "Disque aujourd’hui :"
-  ],
-  "ui.read.2b422": [
-    "read /",
-    "lus /"
-  ],
-  "ui.written.page.cache.f02b7": [
-    "written · Page cache:",
-    "écrits · cache des pages :"
   ],
   "ui.top.apps.hour.by.hour.367fc": [
     "Top apps, hour by hour",
@@ -929,10 +869,6 @@ export const messages = {
   "ui.change.journal.642e1": [
     "Change journal",
     "Journal des changements"
-  ],
-  "ui.change.type.6e6f6": [
-    "Change type",
-    "Type de changement"
   ],
   "ui.no.changes.in.this.period.88120": [
     "No changes in this period.",
@@ -1026,33 +962,9 @@ export const messages = {
     "Label",
     "Étiquette"
   ],
-  "ui.filter.by.label.7fed9": [
-    "Filter by label",
-    "Filtrer par étiquette"
-  ],
-  "ui.all.labels.f3c87": [
-    "All labels",
-    "Toutes les étiquettes"
-  ],
-  "ui.filter.by.state.b3e5d": [
-    "Filter by state",
-    "Filtrer par état"
-  ],
-  "ui.all.states.1740d": [
-    "All states",
-    "Tous les états"
-  ],
   "ui.sort.adc4e": [
     "Sort",
     "Tri"
-  ],
-  "ui.sort.hosts.7af73": [
-    "Sort hosts",
-    "Trier les hôtes"
-  ],
-  "ui.name.709a2": [
-    "Name",
-    "Nom"
   ],
   "ui.no.hosts.match.these.filters.ab0a5": [
     "No hosts match these filters.",
@@ -1318,18 +1230,6 @@ export const messages = {
     "· PID",
     "· PID"
   ],
-  "ui.ram.ac698": [
-    "RAM",
-    "RAM"
-  ],
-  "ui.no.project.processes.found.c00d6": [
-    "No project processes found",
-    "Aucun processus de projet trouvé"
-  ],
-  "ui.configure.project.roots.and.worktree.roots.in.th.edda4": [
-    "Configure project_roots and worktree_roots in the agent config. The process working directory must be inside a root.",
-    "Configurez project_roots et worktree_roots dans l’agent. Le répertoire de travail du processus doit se trouver dans une racine configurée."
-  ],
   "ui.storage.map.ec0f7": [
     "Storage map",
     "Carte du stockage"
@@ -1369,22 +1269,6 @@ export const messages = {
   "ui.at.27e90": [
     "at",
     "à"
-  ],
-  "ui.english.649df": [
-    "English",
-    "Anglais"
-  ],
-  "ui.francais.2ca51": [
-    "Français",
-    "Français"
-  ],
-  "ui.c.a1786": [
-    "°C",
-    "°C"
-  ],
-  "ui.f.770df": [
-    "°F",
-    "°F"
   ],
   "ui.theme.a797e": [
     "Theme",

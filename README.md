@@ -29,6 +29,17 @@
 
 ![Projects view showing the synthetic atlas, orbit and ledger development servers](assets/screenshots/projects-light.png)
 
+<details>
+<summary>See these views in the dark theme</summary>
+
+![Dark-theme Agents view with synthetic sessions](assets/screenshots/agents-dark.png)
+
+![Dark-theme Apps view with synthetic resource groups](assets/screenshots/apps-dark.png)
+
+![Dark-theme Projects view with synthetic development servers](assets/screenshots/projects-dark.png)
+
+</details>
+
 **On the roadmap:** alert delivery and incident workflows, including acknowledgement, snooze and maintenance windows. The current cockpit shows observed issues; it does not send alerts.
 
 ## Quick start
