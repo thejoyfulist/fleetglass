@@ -54,6 +54,23 @@ func TestProjectAndProcessTree(t *testing.T) {
 	}
 }
 
+func TestOutsideProjectRootKeepsWorkingDirectoryLocation(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "workspaces")
+	cwd := filepath.Join(base, "coordination")
+	os.MkdirAll(root, 0700)
+	os.MkdirAll(cwd, 0700)
+	project, location := projectForRoots(cwd, []string{root})
+	if project != "unmatched" || location != "coordination" {
+		t.Fatalf("outside root = %q, %q", project, location)
+	}
+	sessions := []model.AgentSession{{ID: "session", Kind: "claude", Project: "unknown", At: time.Now()}}
+	Enrich(sessions, []Process{{PID: 42, Comm: "claude", CWD: cwd}}, []string{root}, base, time.Now())
+	if sessions[0].Project != "unmatched" || sessions[0].Worktree != "coordination" {
+		t.Fatalf("session location = %q, %q", sessions[0].Project, sessions[0].Worktree)
+	}
+}
+
 func TestProcessMatchRequiresRecency(t *testing.T) {
 	d := t.TempDir()
 	os.WriteFile(filepath.Join(d, "uptime"), []byte("1000.0 0.0\n"), 0600)

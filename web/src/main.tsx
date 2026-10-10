@@ -18,7 +18,6 @@ import {
   formatMoney,
   formatMoneyValue,
   moneyRateNote,
-  formatConverted,
   formatMoneyTotal,
   costMoney,
   formatPercent,
@@ -39,6 +38,8 @@ import {
   quotaWindow,
   resetTime,
   result,
+  sessionDisplayLabel,
+  sessionProject,
   shortDate,
   total,
   value,
@@ -523,7 +524,7 @@ function AgentTable({
     <>
 
       {!compact && detail?<section className="g t session-detail" id="session-detail"><div className="h"><h2>{t("session.title",{agent:agentName(detail.session.kind)})}</h2><span className="src">{detail.session.model||t("value.unknown_model")}</span></div>
-        <TerminalKV rows={[[t("session.start"),hasDate(detail.session.started_at)?formatDateTime(detail.session.started_at):t("value.unknown")],[t("session.end"),hasDate(detail.session.ended_at)?formatDateTime(detail.session.ended_at):t("session.running")],[t("session.duration"),hasDate(detail.session.started_at)?formatDuration(Math.max(0,(new Date(hasDate(detail.session.ended_at)?detail.session.ended_at:Date.now()).getTime()-new Date(detail.session.started_at).getTime())/1000)):t("value.unknown")],[t("ui.cpu.ff221"),detail.session.cpu_seconds?formatDuration(detail.session.cpu_seconds):t("value.unknown")],[t("ui.memory.89c8a"),detail.session.peak_rss_bytes?formatBytes(detail.session.peak_rss_bytes):t("value.unknown")],[t("ui.tokens.c38c6"),detail.usage_measured?formatTokens(total(detail.tokens)):t("value.unknown")],[t("ui.project.f6f4d"),detail.session.project||t("value.unknown")],["Session ID",detail.session.id]]}/>
+        <TerminalKV rows={[[t("session.start"),hasDate(detail.session.started_at)?formatDateTime(detail.session.started_at):t("value.unknown")],[t("session.end"),hasDate(detail.session.ended_at)?formatDateTime(detail.session.ended_at):t("session.running")],[t("session.duration"),hasDate(detail.session.started_at)?formatDuration(Math.max(0,(new Date(hasDate(detail.session.ended_at)?detail.session.ended_at:Date.now()).getTime()-new Date(detail.session.started_at).getTime())/1000)):t("value.unknown")],[t("ui.cpu.ff221"),detail.session.cpu_seconds?formatDuration(detail.session.cpu_seconds):t("value.unknown")],[t("ui.memory.89c8a"),detail.session.peak_rss_bytes?formatBytes(detail.session.peak_rss_bytes):t("value.unknown")],[t("ui.tokens.c38c6"),detail.usage_measured?formatTokens(total(detail.tokens)):t("value.unknown")],[t("ui.project.f6f4d"),sessionProject(detail.session)],["Session ID",detail.session.id]]}/>
         <h3>{t("session.spawned")}</h3>{detail.processes.length?<ul>{detail.processes.map(p=><li key={p.pid}>{p.name} · {p.pid} · {formatBytes(p.memory_bytes)}{p.left_behind?` · ${t("project.left_behind")}`:""}</li>)}</ul>:<p>{t("session.no_spawned")}</p>}
         <SpeedPanel speed={detail.speed} host={host} session={detail.session.id}/>
       </section>:null}
@@ -545,7 +546,7 @@ function AgentTable({
                 ]
           }
           rows={agents.map((a) => {
-            const first = <button type="button" className="terminal-link" onClick={()=>choose(a.id)}>{a.label??a.id.slice(0,16)}</button>;
+            const first = <button type="button" className="terminal-link" onClick={()=>choose(a.id)}>{sessionDisplayLabel(a)}</button>;
             return compact
               ? [
                   first,
@@ -568,7 +569,7 @@ function AgentTable({
                 ]
               : [
                   first,
-                  `${a.project || t("value.unknown")} / ${a.worktree || t("value.unknown")}`,
+                  `${sessionProject(a)} / ${a.worktree || t("value.unknown")}`,
                   <span className={a.state === "erroring" || a.state === "rate-limited" ? "attention" : ""}>{agentState(a.state)}</span>,
                   a.pid ? (
                     <>{formatPercent(a.cpu_percent || 0)} <TerminalBar percent={a.cpu_percent || 0} width={8}/></>
@@ -1014,11 +1015,11 @@ function AgentsView({ data }: { data: ReturnType<typeof useCockpit> }) {
     [state, setState] = useState("All"),
     [query,setQuery] = useState("");
   const agents = data.agents,
-    projects = ["All", ...new Set(agents.map((a) => a.project || t("value.unknown")))],
+    projects = ["All", ...new Set(agents.map(sessionProject))],
     filtered = agents.filter(
       (a) =>
         (kind === "All" || a.kind === kind) &&
-        (project === "All" || (a.project || t("value.unknown")) === project) &&
+        (project === "All" || sessionProject(a) === project) &&
         (state === "All" || a.state === state) &&
         `${a.id} ${a.label??""} ${a.project??""} ${a.model??""}`.toLowerCase().includes(query.toLowerCase()),
     );
@@ -1347,8 +1348,7 @@ function costMethodLabel(method: string): string {
 }
 function MoneyStat({money,amount,currency}: {money?:Money;amount:number;currency:string}) {
   if (!money) return <b>{formatMoney(amount,currency)}</b>;
-  const note = moneyRateNote(money);
-  return <b>{formatMoneyValue(money)}{note ? <small>{note}</small> : null}</b>;
+  return <b>{formatMoneyValue(money)}</b>;
 }
 function CostsView({
   data,
@@ -1359,6 +1359,9 @@ function CostsView({
   range: Range;
   setRange: (r: Range) => void;
 }) {
+  const converted = [...data.costs.map(costMoney), ...data.modelCosts.map(costMoney), ...data.subscriptions.flatMap(x=>[x.api_money,x.subscription_money].filter((m):m is Money=>Boolean(m))), ...[data.energy?.today_money,data.energy?.month_money,data.energy?.price_money].filter((m):m is Money=>Boolean(m))];
+  const rateMoney = converted.find(m=>m.rate_source&&m.rate_date);
+  const rateFootnote = rateMoney ? `${rateMoney.display_currency} at ${moneyRateNote(rateMoney)}` : "";
   return (
     <>
       <PageHead
@@ -1368,12 +1371,13 @@ function CostsView({
         setRange={setRange}
       />
       <div className="bento compact-rows">
+        {rateFootnote?<p className="foot terminal-dim">{rateFootnote}</p>:null}
         <Tile title={t("subscription.title")} source={t("subscription.this_month")} className="full">
-          <TerminalTable heads={[t("terminal.label_plan"),t("subscription.api_equivalent"),t("ui.month.cost.dedfe"),t("terminal.label_state")]} right={[1,2]} rows={data.subscriptions.map(s=>[agentName(s.kind),formatConverted(s.api_money,s.api_equivalent_usd),s.subscription_usd===null?t("terminal.not_collected"):formatConverted(s.subscription_money||undefined,s.subscription_amount??s.subscription_usd),s.coverage])}/>
+          <TerminalTable heads={[t("terminal.label_plan"),t("subscription.api_equivalent"),t("ui.month.cost.dedfe"),t("terminal.label_state")]} right={[1,2]} rows={data.subscriptions.map(s=>[agentName(s.kind),s.api_money?formatMoneyValue(s.api_money):formatMoney(s.api_equivalent_usd),s.subscription_usd===null?t("terminal.not_collected"):s.subscription_money?formatMoneyValue(s.subscription_money):formatMoney(s.subscription_amount??s.subscription_usd),s.coverage])}/>
         </Tile>
         {data.energy?.month_seconds ? <Tile title={t("ui.energy.437bc")} source={t("ui.cpu.package.only.56d4b")} className="half">
           <div className="stat-grid"><div><span>{t("ui.today.24345")}</span><b>{formatNumber(data.energy.today_kwh, 3)} {" "}{t("ui.kwh.72c28")}</b></div><div><span>{t("ui.this.month.1b478")}</span><b>{formatNumber(data.energy.month_kwh, 3)} {" "}{t("ui.kwh.72c28")}</b></div><div><span>{t("ui.today.cost.193fc")}</span><MoneyStat money={data.energy.today_money} amount={data.energy.today_cost} currency={data.energy.currency}/></div><div><span>{t("ui.month.cost.dedfe")}</span><MoneyStat money={data.energy.month_money} amount={data.energy.month_cost} currency={data.energy.currency}/></div></div>
-          <p className="foot">{t("ui.at.08550")}{" "}{(data.energy.price_money ? formatConverted(data.energy.price_money) : formatMoney(data.energy.price_per_kwh,data.energy.currency))}{t("ui.kwh.observed.intervals.only.cpu.package.only.not.148fe")}</p>
+          <p className="foot">{t("ui.at.08550")}{" "}{(data.energy.price_money ? formatMoneyValue(data.energy.price_money) : formatMoney(data.energy.price_per_kwh,data.energy.currency))}{t("ui.kwh.observed.intervals.only.cpu.package.only.not.148fe")}</p>
         </Tile> : null}
         <Tile
           title={t("ui.ai.cost.by.project.26d43")}
@@ -1388,7 +1392,7 @@ function CostsView({
                   rows={data.costs.map((c) => [
                     c.project,
                     costMethodLabel(c.method),
-                    formatConverted(costMoney(c)),
+                    formatMoneyValue(costMoney(c)),
                     c.partial
                       ? t("cost.partial", {tokens:formatTokens(c.unpriced_tokens || 0)})
                       : t("ui.reported.share.c6c3e"),
@@ -1402,7 +1406,7 @@ function CostsView({
           <p className="foot">
             {" "}{data.subscriptions.some(s=>s.subscription_amount!=null || s.subscription_usd!==null)?t("ui.api.equivalent.is.an.estimate.not.a.bill.subscri.101cc"):t("subscription.no_config_foot")}{" "}</p>
         </Tile>
-        <Tile title="API equivalent by model" className="half"><TerminalTable heads={[t("terminal.label_model"),t("terminal.label_amount")]} right={[1]} rows={data.modelCosts.filter(c=>c.method==="api_equivalent").map(c=>[c.model??c.project,formatConverted(costMoney(c))])}/></Tile>
+        <Tile title="API equivalent by model" className="half"><TerminalTable heads={[t("terminal.label_model"),t("terminal.label_amount")]} right={[1]} rows={data.modelCosts.filter(c=>c.method==="api_equivalent").map(c=>[c.model??c.project,formatMoneyValue(costMoney(c))])}/></Tile>
         <Tile title={t("ui.tokens.by.model.92019")} source={t("ui.all.token.types.9ba49")} className={data.energy?.month_seconds ? "full content-height" : "half content-height"}>
           {data.models.length ? (
             <List
@@ -1475,7 +1479,7 @@ function Palette({
       run: () => selectHost(h.host_id),
     })),
     ...agents.map((a) => ({
-      label: a.label || `${agentName(a.kind)} · ${a.project || a.id}`,
+      label: sessionDisplayLabel(a),
       group: t("palette.agent"),
       run: () => {
         go("agents");
@@ -1628,12 +1632,12 @@ function App() {
     [token, setToken] = useState(""),
     [authError, setAuthError] = useState(""),
     [palette, setPalette] = useState(false),
-    [release, setRelease] = useState<{version:string;latest:string;update_check_enabled:boolean}|null>(null),
+    [release, setRelease] = useState<{version:string;commit?:string;latest:string;update_check_enabled:boolean}|null>(null),
     [tick, setTick] = useState(Date.now());
   const hadPreferences = useRef(hasPreferences());
   const hadCurrency = useRef((() => { try { return !!JSON.parse(localStorage.getItem("fleetglass.preferences.v1") || "null")?.currency; } catch { return false; } })());
   useCockpitLanguage(preferences.language);
-  useEffect(() => { if (auth === "ready") get<{version:string;latest:string;update_check_enabled:boolean}>("/api/v1/version").then(setRelease).catch(()=>{}); }, [auth]);
+  useEffect(() => { if (auth === "ready") get<{version:string;commit?:string;latest:string;update_check_enabled:boolean}>("/api/v1/version").then(setRelease).catch(()=>{}); }, [auth]);
   useEffect(() => {
     if (auth !== "ready") return;
     get<{language:string;temperature:string;network:string;cpu:string;currency:string}>("/api/v1/display-defaults").then(raw => {
@@ -1751,6 +1755,7 @@ function App() {
       : null,
     stale = data.stream === "stale" || (age !== null && age > 45);
   setLanguage(preferences.language);
+  const displayVersion = release?.version?.includes("dev") && release.commit && release.commit !== "unknown" ? release.commit.slice(0, 7) : release?.version ?? "";
   return (
     <div className="shell">
       <div className="terminal-header">
@@ -1759,7 +1764,7 @@ function App() {
         <span className="terminal-window-title"><MonoMark/>{host || "fleetglass"} - fleetglass - {Math.max(40,Math.floor((typeof window !== "undefined" ? window.innerWidth : 1440)/7.5))}x{Math.max(20,Math.floor((typeof window !== "undefined" ? window.innerHeight : 900)/18))}</span>
       </div>
       <header className="top">
-        <div className="terminal-status"><MonoMark/><b>fleetglass {release?.version ?? ""}</b><span className="terminal-separator">│</span><span className="host"><TerminalFilter label={t("ui.host.3960e")} choices={hosts.map(h=>h.host_id)} value={host} onChange={setHost}/></span><span className="terminal-separator">│</span><span>{t("terminal.status_up")} {value(result(data.overview?.results||[],"host"),"uptime_seconds")===null?t("terminal.not_collected"):(()=>{const minutes=Math.floor(value(result(data.overview?.results||[],"host"),"uptime_seconds")!/60);return `${Math.floor(minutes/1440)}d ${String(Math.floor(minutes%1440/60)).padStart(2,"0")}:${String(minutes%60).padStart(2,"0")}`})()}</span><span className="terminal-separator">│</span><span>{t("terminal.status_kernel")} {result(data.overview?.results||[],"host")?.fields?.kernel_release?`Linux ${result(data.overview?.results||[],"host")?.fields?.kernel_release} ${result(data.overview?.results||[],"host")?.fields?.arch??""}`:t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_load")} {value(result(data.overview?.results||[],"load"),"1m")?.toFixed(2) ?? t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{value(result(data.overview?.results||[],"cpu"),"core_count") ?? "—"} {t("terminal.label_threads")} · {value(result(data.overview?.results||[],"memory"),"total_bytes")===null?t("terminal.not_collected"):formatBytes(value(result(data.overview?.results||[],"memory"),"total_bytes"))}</span><span className="terminal-separator">│</span><span className="terminal-warn-count">{data.overview?.results.filter(x=>x.state==="warn").length ?? 0} WARN</span><span className="terminal-crit-count">{data.overview?.results.filter(x=>x.state==="crit").length ?? 0} CRIT</span><span>{data.stream === "stale" ? t("ui.connection.lost.62583") : stale ? t("ui.stale.data.2e635") : data.stream === "connecting" ? t("ui.connecting.c1f3b") : t("ui.live.65c82")}</span><span className="terminal-time">{new Date(tick).toLocaleString(preferences.language === "fr" ? "fr-FR" : "sv-SE",{dateStyle:"short",timeStyle:"medium",hour12:false})}</span>{protectedServer?<button type="button" className="quiet" onClick={signOut}>{t("ui.sign.out.dc164")}</button>:null}</div>
+        <div className="terminal-status"><MonoMark/><b>fleetglass {displayVersion}</b><span className="terminal-separator">│</span><span className="host"><TerminalFilter label={t("ui.host.3960e")} choices={hosts.map(h=>h.host_id)} value={host} onChange={setHost}/></span><span className="terminal-separator">│</span><span>{t("terminal.status_up")} {value(result(data.overview?.results||[],"host"),"uptime_seconds")===null?t("terminal.not_collected"):(()=>{const minutes=Math.floor(value(result(data.overview?.results||[],"host"),"uptime_seconds")!/60);return `${Math.floor(minutes/1440)}d ${String(Math.floor(minutes%1440/60)).padStart(2,"0")}:${String(minutes%60).padStart(2,"0")}`})()}</span><span className="terminal-separator">│</span><span>{t("terminal.status_kernel")} {result(data.overview?.results||[],"host")?.fields?.kernel_release?`Linux ${result(data.overview?.results||[],"host")?.fields?.kernel_release} ${result(data.overview?.results||[],"host")?.fields?.arch??""}`:t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_load")} {value(result(data.overview?.results||[],"load"),"1m")?.toFixed(2) ?? t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{value(result(data.overview?.results||[],"cpu"),"core_count") ?? "—"} {t("terminal.label_threads")} · {value(result(data.overview?.results||[],"memory"),"total_bytes")===null?t("terminal.not_collected"):formatBytes(value(result(data.overview?.results||[],"memory"),"total_bytes"))}</span><span className="terminal-separator">│</span><span className="terminal-warn-count">{data.overview?.results.filter(x=>x.state==="warn").length ?? 0} WARN</span><span className="terminal-crit-count">{data.overview?.results.filter(x=>x.state==="crit").length ?? 0} CRIT</span><span>{data.stream === "stale" ? t("ui.connection.lost.62583") : stale ? t("ui.stale.data.2e635") : data.stream === "connecting" ? t("ui.connecting.c1f3b") : t("ui.live.65c82")}</span><span className="terminal-time">{new Date(tick).toLocaleString(preferences.language === "fr" ? "fr-FR" : "sv-SE",{dateStyle:"short",timeStyle:"medium",hour12:false})}</span>{protectedServer?<button type="button" className="quiet" onClick={signOut}>{t("ui.sign.out.dc164")}</button>:null}</div>
       </header>
       <div className="terminal-tabs"><nav className="tabs" aria-label={t("ui.views.24be6")}>{terminalViews.filter(v=>!preferences.hiddenTabs.includes(v)).map(v=>{const index=terminalViews.indexOf(v);return <button type="button" key={v} aria-pressed={view===v||(v==="machine"&&view==="storage")} onClick={()=>go(v)}>{index===9?0:index+1} {t(navigationLabels[v as keyof typeof navigationLabels], preferences.language).toLowerCase()}</button>})}<button type="button" className="terminal-search" onClick={()=>setPalette(true)} aria-label={t("ui.search.or.jump.to.commands.control.or.command.k.26860")} title={t("ui.search.or.jump.to.commands.ctrl.k.50228")}>{t("ui.k.64d86")}</button>{hosts.length>1?<button type="button" onClick={()=>go("fleet")}>{formatNumber(fleet.filter(h=>h.liveness==="live").length)} {t("ui.of.de04f")} {formatNumber(fleet.length)} {t("ui.hosts.reporting.57618")} · {formatNumber(fleet.filter(h=>h.liveness!=="live").length)} {t("ui.need.attention.c8806")} · {t("ui.view.fleet.8d8a0")}</button>:null}<button type="button" aria-pressed={view==="settings"} onClick={()=>go("settings")}>{t("ui.settings.c7f73",preferences.language).toLowerCase()}</button><button type="button" aria-pressed={view==="glossary"} onClick={()=>go("glossary")}>{t("terminal.glossary")}</button></nav><div className="terminal-range" role="group" aria-label={t("terminal.range")}>{t("terminal.range")} {(["1h","24h","7d","30d"] as Range[]).map(v=><button key={v} type="button" aria-pressed={range===v} onClick={()=>setRange(v)}>{v}</button>)}</div><div className="terminal-theme" role="group" aria-label={t("terminal.theme")}>{(["system","light","dark"] as const).map(mode=><button type="button" key={mode} aria-pressed={themeMode===mode} onClick={()=>setTheme(mode)}>{mode === "system" ? t("terminal.system") : mode === "light" ? t("terminal.light") : t("terminal.dark")}</button>)}</div></div>
       </div>
@@ -1843,7 +1848,7 @@ function App() {
           selectHost={setHost}
         />
       ) : null}
-      {auth === "ready" ? <footer className="terminal-footer"><span><kbd>1-9/0</kbd>{t("terminal.views")}</span><span><kbd>r</kbd>{t("terminal.range")} {range}</span><span><kbd>/</kbd>{t("terminal.filter")}</span><span><kbd>?</kbd>{t("terminal.glossary")}</span><span><kbd>t</kbd>{t("terminal.theme")}</span><span className="terminal-footer-end">{release?t("release.version",{version:release.version}):""} · {release?.update_check_enabled&&release.latest&&release.latest!==release.version?t("release.update",{version:release.latest}):""} · {t("terminal.read_only")} · {data.stream} · {age===null?"—":t("live.seconds_ago",{seconds:age})}</span></footer> : null}
+      {auth === "ready" ? <footer className="terminal-footer"><span><kbd>1-9/0</kbd>{t("terminal.views")}</span><span><kbd>r</kbd>{t("terminal.range")} {range}</span><span><kbd>/</kbd>{t("terminal.filter")}</span><span><kbd>?</kbd>{t("terminal.glossary")}</span><span><kbd>t</kbd>{t("terminal.theme")}</span><span className="terminal-footer-end">{release?t("release.version",{version:displayVersion}):""} · {release?.update_check_enabled&&release.latest&&release.latest!==release.version?t("release.update",{version:release.latest}):""} · {t("terminal.read_only")} · {data.stream} · {age===null?"—":t("live.seconds_ago",{seconds:age})}</span></footer> : null}
     </div>
   );
 }

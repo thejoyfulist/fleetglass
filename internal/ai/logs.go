@@ -31,6 +31,7 @@ type LogReader struct {
 	seen           map[string]model.AIUsage
 	fileSession    map[string]string
 	fileProject    map[string]string
+	fileWorktree   map[string]string
 	fileModel      map[string]string
 	latestQuotas   map[string]model.Quota
 	latestSessions map[string]model.AgentSession
@@ -60,7 +61,7 @@ func NewLogReader(roots []Root) *LogReader {
 		}
 		sort.Slice(known[root.Path], func(i, j int) bool { return len(known[root.Path][i]) > len(known[root.Path][j]) })
 	}
-	return &LogReader{offsets: map[string]cursor{}, seen: map[string]model.AIUsage{}, fileSession: map[string]string{}, fileProject: map[string]string{}, fileModel: map[string]string{}, latestQuotas: map[string]model.Quota{}, latestSessions: map[string]model.AgentSession{}, messageStart: map[string]time.Time{}, messageLast: map[string]time.Time{}, knownProjects: known, Roots: roots, ByteLimit: 1 << 20, TimeLimit: 4 * time.Second}
+	return &LogReader{offsets: map[string]cursor{}, seen: map[string]model.AIUsage{}, fileSession: map[string]string{}, fileProject: map[string]string{}, fileWorktree: map[string]string{}, fileModel: map[string]string{}, latestQuotas: map[string]model.Quota{}, latestSessions: map[string]model.AgentSession{}, messageStart: map[string]time.Time{}, messageLast: map[string]time.Time{}, knownProjects: known, Roots: roots, ByteLimit: 1 << 20, TimeLimit: 4 * time.Second}
 }
 func safePath(p string) bool {
 	p = filepath.Clean(p)
@@ -208,8 +209,9 @@ func (r *LogReader) Scan(now time.Time) model.AI {
 					if json.Unmarshal(line, &meta) == nil && meta.Type == "session_meta" && meta.Payload.ID != "" {
 						r.fileSession[path] = Hash(meta.Payload.ID)
 						if filepath.IsAbs(meta.Payload.CWD) {
-							project, _ := projectForRoots(meta.Payload.CWD, r.WorktreeRoots)
+							project, worktree := projectForRoots(meta.Payload.CWD, r.WorktreeRoots)
 							r.fileProject[path] = project
+							r.fileWorktree[path] = worktree
 						}
 					}
 					if meta.Type == "session_meta" || meta.Type == "turn_context" {
@@ -259,7 +261,7 @@ func (r *LogReader) Scan(now time.Time) model.AI {
 					if old, ok := r.latestSessions[session]; ok && !old.StartedAt.IsZero() && old.StartedAt.Before(started) {
 						started = old.StartedAt
 					}
-					sessions[session] = model.AgentSession{ID: session, Kind: root.Kind, Model: modelName, Project: project, At: at, StartedAt: started, State: "working", Reason: "recent log activity", Source: "log", LastTurnEnded: ended}
+					sessions[session] = model.AgentSession{ID: session, Kind: root.Kind, Model: modelName, Project: project, Worktree: r.fileWorktree[path], At: at, StartedAt: started, State: "working", Reason: "recent log activity", Source: "log", LastTurnEnded: ended}
 				}
 				if root.Kind == "claude" {
 					var msg struct {

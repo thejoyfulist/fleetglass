@@ -12,6 +12,26 @@ sys.path.insert(0, str(Path(__file__).parent))
 import showcase  # Synthetic fixtures only.
 import visual_check as fixture
 
+RATE = {"original": 24.05, "currency": "USD", "converted": 20.83,
+        "display_currency": "EUR", "rate_source": "ecb", "rate_date": "2026-10-09"}
+fixture.AGENTS[0]["api_money"] = RATE
+fixture.AGENTS[0]["project"] = "unmatched"
+fixture.AGENTS[0]["worktree"] = "coordination"
+fixture.AGENTS[0]["label"] = "claude · unmatched · demo-1"
+fixture.APPS[0]["name"] = "Claude session · coordination · abcdef12"
+fixture.APPS[1]["name"] = "Container synthetic-worker-12345678"
+fixture.APPS[-1]["name"] = "Other / not attributed"
+fixture.MODEL_COSTS[0]["money"] = RATE
+fixture.COSTS[0]["money"] = RATE
+fixture.SPEED.extend([{**fixture.SPEED[0], "model": "gpt-6-sol", "live_tokens_per_second": 12.0},
+                      {**fixture.SPEED[0], "model": "idle-model", "live_tokens_per_second": 0.0,
+                       "median_tokens_per_second": 0.0}])
+fixture.RESULTS.extend([
+    fixture.result(f"recent_error:{i}", {"count": i + 1}, state="warn", detail="journal error group") | {"fields": {"unit": f"demo-{i}.service"}}
+    for i in range(5)
+])
+fixture.RESULTS.append(fixture.result("repository:0:atlas", {"dirty": 1, "dirty_count": 4}, state="warn", detail="4 uncommitted files") | {"fields": {"repository": "atlas"}})
+
 OUT = Path(tempfile.mkdtemp(prefix="fleetglass-m10-views-"))
 VIEWS = ("overview", "agents", "apps", "projects", "machine", "storage", "services", "system", "changes", "costs", "uptime", "settings", "glossary", "fleet", "share")
 SECTIONS = ("CPU", "Memory", "Disk", "Network", "Containers")
@@ -19,6 +39,11 @@ SECTIONS = ("CPU", "Memory", "Disk", "Network", "Containers")
 class Handler(showcase.ShowcaseHandler):
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/api/v1/version":
+            body = json.dumps({"version": "0.0.0-dev", "commit": "93f9731e5c5d", "latest": "", "update_check_enabled": False}).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+            return
         if path in ("/api/v1/hosts", "/api/v1/fleet"):
             hosts = [{"host_id": "demo-01", "at": fixture.iso(), "liveness": "live", "normal": 12, "checks": 13, "cpu": 18, "memory": 34, "disk": 24, "agents": 3, "usage": fixture.USAGE, "costs": fixture.COSTS},
                      {"host_id": "demo-02", "at": fixture.iso(), "liveness": "live", "normal": 10, "checks": 10, "cpu": 8, "memory": 20, "disk": 12, "agents": 0, "usage": [], "costs": []}]
@@ -47,6 +72,7 @@ def inspect(page, width):
       if(width===1440){
         for(const body of document.querySelectorAll('.terminal-box-body, main .g.t'))if(body.scrollWidth>body.clientWidth+1)errors.push('panel overflow: '+(body.parentElement.getAttribute('aria-label')||body.className));
         for(const scroller of document.querySelectorAll('main .terminal-table-scroll'))if(scroller.scrollWidth>scroller.clientWidth+1)errors.push('table overflow: '+scroller.closest('section')?.getAttribute('aria-label'));
+        for(const cell of document.querySelectorAll('main .terminal-data-table td.numeric'))if(cell.scrollWidth>cell.clientWidth+1)errors.push('numeric cell clipped: '+cell.innerText);
       }
       const tag=document.querySelector('.terminal-warn .terminal-tag');
       if(tag&&getComputedStyle(tag).backgroundColor!=='rgb(0, 166, 178)')errors.push('warning tag colour');
@@ -101,6 +127,18 @@ def main():
                         if "12d 01:50" not in status or "Linux 6.12.1-demo amd64" not in status: errors.append(f"{theme}: host facts missing")
                         if "2200 / 3600 MHz" not in content or "demo.example" not in content: errors.append(f"{theme}: frequency or DNS missing")
                         if detail_requests: errors.append(f"{theme}: overview requested session details: {len(detail_requests)}")
+                        memory=page.get_by_role('region',name='Memory')
+                        if memory.locator('td.numeric').first.is_visible() is False: errors.append(f"{theme}: RSS clipped")
+                        first_name=memory.locator('td.terminal-name-cell').first
+                        if not first_name.get_attribute('title') or '…' not in first_name.inner_text(): errors.append(f"{theme}: app name not truncated with full title")
+                        if 'journal errors: demo-0.service · 1 in 24 h' not in content or 'more' not in page.get_by_role('region',name='attention').inner_text(): errors.append(f"{theme}: attention labels or overflow missing")
+                        if 'idle-model' in content or content.count('gpt-6-sol:')>1: errors.append(f"{theme}: speed includes idle or duplicate models")
+                        if 'ECB rate' in page.locator('table').all_inner_texts().__str__(): errors.append(f"{theme}: rate repeated in table cells")
+                        if 'unmatched' in page.get_by_role('region',name='AI agents').inner_text(): errors.append(f"{theme}: unmatched session label")
+                        if '0.0.0-dev' in status or '93f9731' not in status: errors.append(f"{theme}: dev commit missing")
+                    if view=="costs":
+                        if 'ECB rate' in str(page.locator('table').all_inner_texts()): errors.append(f"{theme}: Costs table repeats conversion source")
+                        if page.locator('main').inner_text().count('EUR at ECB rate Oct 9') != 1: errors.append(f"{theme}: Costs conversion source is not shown once")
                     errors.extend(f"{view}-{theme}: {e}" for e in inspect(page,1440))
                     page.screenshot(path=str(OUT/f"{view}-{theme}.png"),full_page=True)
                     if view in ("overview", "agents"):

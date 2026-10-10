@@ -26,5 +26,5 @@ func (a *API) version(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, map[string]any{"version": a.Version, "latest": a.updateTag, "update_check_enabled": a.UpdateCheckURL != ""})
+	writeJSON(w, map[string]any{"version": a.Version, "commit": a.Commit, "latest": a.updateTag, "update_check_enabled": a.UpdateCheckURL != ""})
 }

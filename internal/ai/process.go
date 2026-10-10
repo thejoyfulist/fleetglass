@@ -94,7 +94,15 @@ func projectForRoots(cwd string, roots []string) (string, string) {
 			return Project(cwd, root)
 		}
 	}
+	if len(roots) > 0 && filepath.IsAbs(cwd) {
+		return "unmatched", filepath.Base(filepath.Clean(cwd))
+	}
 	return Project(cwd, "")
+}
+
+func outsideProject(cwd string) string {
+	project, _ := Project(cwd, "")
+	return project
 }
 
 // MergeSessions keeps one record per session before assigning processes.
@@ -116,6 +124,9 @@ func MergeSessions(sessions []model.AgentSession) []model.AgentSession {
 		}
 		if preferred.Project == "" || preferred.Project == "unknown" {
 			preferred.Project = other.Project
+		}
+		if preferred.Worktree == "" {
+			preferred.Worktree = other.Worktree
 		}
 		if preferred.Model == "" {
 			preferred.Model = other.Model
@@ -148,7 +159,7 @@ func Enrich(sessions []model.AgentSession, processes []Process, roots []string, 
 				continue
 			}
 			project, worktree := projectForRoots(p.CWD, roots)
-			if sessions[i].Project != "" && sessions[i].Project != "unknown" && sessions[i].Project != project {
+			if sessions[i].Project != "" && sessions[i].Project != "unknown" && sessions[i].Project != "unmatched" && sessions[i].Project != project && (project != "unmatched" || sessions[i].Project != outsideProject(p.CWD)) {
 				continue
 			}
 			if sessions[i].Kind == "claude" && !strings.HasPrefix(p.Comm, "claude") || sessions[i].Kind == "codex" && !strings.HasPrefix(p.Comm, "codex") {

@@ -107,6 +107,7 @@ func main() {
 	}
 	a.DisplayDefaults = c.DisplayDefaults
 	a.Version = version.Version
+	a.Commit = version.Commit
 	a.UpdateCheckURL = c.UpdateCheckURL
 	if c.MCPListen != "" {
 		mcp := &http.Server{Addr: c.MCPListen, Handler: a.MCPHandler(c.MCPToken), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 1 << 20}

@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {blockBar, formatTextTable} from "./terminal-format";
+import {attentionLabel, blockBar, formatTextTable, measuredSpeed, truncateName} from "./terminal-format";
 
 describe("terminal text rendering", () => {
   it("aligns columns and preserves markup tones", () => {
@@ -16,5 +16,19 @@ describe("terminal text rendering", () => {
     expect(blockBar(38, 10, 60).map(cell => cell.text).join("")).toBe("████░░│░░░");
     expect(blockBar(150, 4).map(cell => cell.text).join("")).toBe("████");
     expect(blockBar(-2, 4).map(cell => cell.text).join("")).toBe("░░░░");
+  });
+  it("truncates long names without splitting Unicode characters", () => {
+    expect(truncateName("Other / not attributed", 12)).toBe("Other / not…");
+    expect(truncateName("short", 12)).toBe("short");
+    expect(truncateName("🚀🚀🚀", 2)).toBe("🚀…");
+  });
+  it("names attention families from structured fields", () => {
+    expect(attentionLabel({name:"recent_error:0",state:"warn",detail:"journal error group",values:{count:2},fields:{unit:"demo.service"}})).toBe("journal errors: demo.service · 2 in 24 h");
+    expect(attentionLabel({name:"repository:0:atlas",state:"warn",detail:"4 uncommitted files",values:{dirty_count:4},fields:{repository:"atlas"}})).toBe("atlas: 4 uncommitted files");
+    expect(attentionLabel({name:"recent_errors",state:"warn",detail:"journal, last 24 h",values:{count:3}})).toBe("journal errors: 3 in 24 h");
+  });
+  it("keeps one positive speed measurement per model", () => {
+    const speed = (model:string, rate:number) => ({kind:"codex",model,method:"estimated",window:"1h",live_tokens_per_second:rate,median_tokens_per_second:rate,p95_tokens_per_second:null,median_duration_ms:null,median_first_token_ms:null,tokens_per_minute:0,requests_per_minute:0,api_errors:0,retries:0});
+    expect(measuredSpeed([speed("fast",12),speed("idle",0),speed("fast",8)]).map(x=>[x.model,x.rate])).toEqual([["fast",12]]);
   });
 });

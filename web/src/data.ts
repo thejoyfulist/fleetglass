@@ -37,6 +37,11 @@ export interface Session {
   source: string;
   session_count?: number;
 }
+export function sessionProject(session: Session): string { return session.project && session.project !== "unmatched" ? session.project : "—"; }
+export function sessionDisplayLabel(session: Session): string {
+  if (session.project !== "unmatched") return session.label || session.id.slice(0,16);
+  return `${session.kind} · ${session.worktree?.split("/").at(-1) || "session"} · ${session.id.slice(0,8)}`;
+}
 export interface Money { original:number; currency:string; converted:number|null; display_currency:string; rate?:number; rate_source?:string; rate_date?:string }
 export interface SessionDetail {session:Session;tokens:Tokens;usage_measured:boolean;tokens_per_minute:number;api_equivalent_usd:number;cli_reported_usd:number;api_money?:Money;cli_money?:Money;unpriced_tokens:number;processes:ProjectProcess[];speed:SpeedSummary[]}
 export interface Overview {
@@ -490,6 +495,11 @@ export function formatMoneyTotal(rows: Money[]): string {
   const label = formatMoney(amount, first.display_currency);
   const rates = [...new Set(rows.filter(m => m.rate_source && m.rate_date).map(m => rateDescription(m.rate_source!,m.rate_date!)))];
   return rates.length ? `${label} (${rates.join(", ")})` : label;
+}
+export function formatMoneyTotalValue(rows: Money[]): string {
+  if (!rows.length) return formatMoney(0, readDisplayCurrency());
+  if (rows.some(m => m.converted === null)) return rows.map(formatMoneyValue).join(" + ");
+  return formatMoney(rows.reduce((sum,m) => sum + (m.converted ?? 0),0),rows[0].display_currency);
 }
 export function costMoney(cost: Cost): Money {
   if (cost.money) return cost.money;

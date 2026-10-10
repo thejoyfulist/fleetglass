@@ -10,6 +10,7 @@ import {
   formatDuration,
   formatMoney,
   formatConverted,
+  formatMoneyTotalValue,
   formatPercent,
   formatRate,
   formatQuotaPercent,
@@ -22,6 +23,8 @@ import {
   quotaMethod,
   quotaWindow,
   resetTime,
+  sessionDisplayLabel,
+  sessionProject,
   reconnectDelay,
   saveTheme,
   themePreference,
@@ -60,6 +63,12 @@ describe("formatting", () => {
     setLanguage("en");
     expect(formatMoney(12.68,"EUR")).toBe("€12.68");
     expect(formatConverted({original:12.68,currency:"EUR",converted:null,display_currency:"USD"})).toContain("rate unavailable");
+  });
+  it("keeps rate details out of compact amounts and names unmatched sessions by location", () => {
+    expect(formatMoneyTotalValue([{original:20.83,currency:"EUR",converted:20.83,display_currency:"EUR",rate_source:"ecb",rate_date:"2026-10-09"}])).toBe("€20.83");
+    const session = {id:"abcdef123456",kind:"claude",project:"unmatched",worktree:"/tmp/coordination",at:"",state:"working",reason:"",source:"log"};
+    expect(sessionProject(session)).toBe("—");
+    expect(sessionDisplayLabel(session)).toBe("claude · coordination · abcdef12");
   });
 });
 describe("observation titles", () => {

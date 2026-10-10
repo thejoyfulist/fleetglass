@@ -114,6 +114,22 @@ func TestCodexProjectFromConfiguredWorktreeRoot(t *testing.T) {
 	}
 }
 
+func TestCodexOutsideConfiguredRootUsesCWDLocation(t *testing.T) {
+	d := t.TempDir()
+	logRoot := filepath.Join(d, "logs")
+	os.MkdirAll(logRoot, 0700)
+	cwd := filepath.Join(d, "coordination")
+	now := time.Now().UTC()
+	line := `{"timestamp":"` + now.Format(time.RFC3339Nano) + `","type":"session_meta","payload":{"id":"demo-session","cwd":"` + cwd + `"}}` + "\n"
+	os.WriteFile(filepath.Join(logRoot, "rollout.jsonl"), []byte(line), 0600)
+	r := NewLogReader([]Root{{Kind: "codex", Path: logRoot}})
+	r.WorktreeRoots = []string{filepath.Join(d, "workspaces")}
+	got := r.Scan(now)
+	if len(got.Sessions) != 1 || got.Sessions[0].Project != "unmatched" || got.Sessions[0].Worktree != "coordination" {
+		t.Fatalf("outside root location: %+v", got.Sessions)
+	}
+}
+
 func TestCodexModelFromAnonymizedRollout(t *testing.T) {
 	fixture, err := os.ReadFile("testdata/codex-rollout-anonymized.jsonl")
 	if err != nil {

@@ -37,6 +37,7 @@ type API struct {
 	DisplayCurrency   string
 	Money             *money.Service
 	Version           string
+	Commit            string
 	UpdateCheckURL    string
 	updateAt          time.Time
 	updateTag         string
