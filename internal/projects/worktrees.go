@@ -86,6 +86,7 @@ func ScanWorktrees(ctx context.Context, roots []string, processes []model.Projec
 					}
 				}
 				treeCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+				entry.Branch, _ = gitRead(treeCtx, path, "symbolic-ref", "--quiet", "--short", "HEAD")
 				if raw, ok := gitRead(treeCtx, path, "log", "-1", "--format=%cI"); ok {
 					entry.LastCommitAt, _ = time.Parse(time.RFC3339, raw)
 				}

@@ -140,42 +140,64 @@ func (s *Store) AgentsWithSummary(host string, overrides map[string]model.AIPric
 	for i := range sessions {
 		index[sessions[i].ID] = i
 	}
-	rows, err := s.DB.Query(`SELECT data FROM ai_usage WHERE host_id=?`, host)
-	if err != nil {
-		return nil, err
+	if len(sessions) == 0 {
+		return sessions, nil
 	}
-	defer rows.Close()
 	prices := effectivePrices(overrides)
 	latest := map[string]time.Time{}
 	now := time.Now()
-	for rows.Next() {
-		var raw string
-		if err = rows.Scan(&raw); err != nil {
+	ids := make([]string, 0, len(index))
+	for id := range index {
+		ids = append(ids, id)
+	}
+	const chunkSize = 400
+	for start := 0; start < len(ids); start += chunkSize {
+		end := min(start+chunkSize, len(ids))
+		args := make([]any, end-start+1)
+		args[0] = host
+		for i, id := range ids[start:end] {
+			args[i+1] = id
+		}
+		query := `SELECT data FROM ai_usage WHERE host_id=? AND session_id IN (` + strings.TrimSuffix(strings.Repeat("?,", end-start), ",") + `)`
+		rows, err := s.DB.Query(query, args...)
+		if err != nil {
 			return nil, err
 		}
-		var u model.AIUsage
-		if json.Unmarshal([]byte(raw), &u) != nil {
-			continue
+		for rows.Next() {
+			var raw string
+			if err = rows.Scan(&raw); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			var u model.AIUsage
+			if json.Unmarshal([]byte(raw), &u) != nil {
+				continue
+			}
+			i, ok := index[u.Session]
+			if !ok {
+				continue
+			}
+			v := &sessions[i]
+			if u.Tokens.Input+u.Tokens.Output+u.Tokens.CacheRead+u.Tokens.CacheWrite > 0 {
+				v.UsageMeasured = true
+			}
+			if price, ok := modelPrice(prices, u.Model); ok {
+				v.APIEquivalentUSD += (float64(u.Tokens.Input)*price.Input + float64(u.Tokens.Output)*price.Output + float64(u.Tokens.CacheWrite)*price.CacheWrite + float64(u.Tokens.CacheRead)*price.CacheRead) / 1e6
+			}
+			if u.OutputTokensPerSecond > 0 && now.Sub(u.At) <= time.Hour && u.At.After(latest[u.Session]) {
+				rate := u.OutputTokensPerSecond
+				v.SpeedTokensPerSecond = &rate
+				v.SpeedMethod = u.SpeedMethod
+				latest[u.Session] = u.At
+			}
 		}
-		i, ok := index[u.Session]
-		if !ok {
-			continue
-		}
-		v := &sessions[i]
-		if u.Tokens.Input+u.Tokens.Output+u.Tokens.CacheRead+u.Tokens.CacheWrite > 0 {
-			v.UsageMeasured = true
-		}
-		if price, ok := modelPrice(prices, u.Model); ok {
-			v.APIEquivalentUSD += (float64(u.Tokens.Input)*price.Input + float64(u.Tokens.Output)*price.Output + float64(u.Tokens.CacheWrite)*price.CacheWrite + float64(u.Tokens.CacheRead)*price.CacheRead) / 1e6
-		}
-		if u.OutputTokensPerSecond > 0 && now.Sub(u.At) <= time.Hour && u.At.After(latest[u.Session]) {
-			rate := u.OutputTokensPerSecond
-			v.SpeedTokensPerSecond = &rate
-			v.SpeedMethod = u.SpeedMethod
-			latest[u.Session] = u.At
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
 		}
 	}
-	return sessions, rows.Err()
+	return sessions, nil
 }
 
 func (s *Store) agentsAt(host string, now time.Time) ([]model.AgentSession, error) {
@@ -206,7 +228,35 @@ func (s *Store) agentsAt(host string, now time.Time) ([]model.AgentSession, erro
 			out = append(out, v)
 		}
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	hasWorktree := false
+	for _, session := range out {
+		if session.Worktree != "" {
+			hasWorktree = true
+			break
+		}
+	}
+	if !hasWorktree {
+		return out, nil
+	}
+	trees, err := s.Worktrees(host, now)
+	if err != nil {
+		return nil, err
+	}
+	branches := make(map[string]string, len(trees.Worktrees))
+	for _, tree := range trees.Worktrees {
+		branches[tree.Path] = tree.Branch
+	}
+	for i := range out {
+		if branch := branches[out[i].Worktree]; branch != "" {
+			out[i].Branch = branch
+			out[i].Label = SessionLabel(out[i])
+		}
+	}
+	return out, nil
 }
 func duration(name string) (time.Duration, error) {
 	d, ok := map[string]time.Duration{"1h": time.Hour, "12h": 12 * time.Hour, "24h": 24 * time.Hour, "7d": 7 * 24 * time.Hour, "30d": 30 * 24 * time.Hour}[name]

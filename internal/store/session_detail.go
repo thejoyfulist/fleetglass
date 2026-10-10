@@ -32,6 +32,19 @@ func (s *Store) SessionDetail(host, id string, overrides map[string]model.AIPric
 	if err := json.Unmarshal([]byte(raw), &out.Session); err != nil {
 		return out, err
 	}
+	if out.Session.Worktree != "" {
+		var treeRaw string
+		err := s.DB.QueryRow(`SELECT data FROM worktree_latest WHERE host_id=? AND path=? AND at_ns>=?`, host, out.Session.Worktree, time.Now().Add(-2*time.Hour).UnixNano()).Scan(&treeRaw)
+		if err != nil && err != sql.ErrNoRows {
+			return out, err
+		}
+		if err == nil {
+			var tree model.WorktreeEntry
+			if json.Unmarshal([]byte(treeRaw), &tree) == nil {
+				out.Session.Branch = tree.Branch
+			}
+		}
+	}
 	out.Session.Label = SessionLabel(out.Session)
 	rows, err := s.DB.Query(`SELECT data FROM ai_usage WHERE host_id=? AND session_id=?`, host, id)
 	if err != nil {

@@ -84,6 +84,63 @@ func TestCostsByModelAndSessionSummary(t *testing.T) {
 	}
 }
 
+func TestAgentsSummaryUsesSessionIndex(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "agents-index.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	var indexed int
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM pragma_index_info('ai_usage_session') WHERE name IN ('host_id','session_id')`).Scan(&indexed); err != nil || indexed != 2 {
+		t.Fatalf("missing session index: count=%d err=%v", indexed, err)
+	}
+	var id, parent, unused string
+	var detail string
+	if err := s.DB.QueryRow(`EXPLAIN QUERY PLAN SELECT data FROM ai_usage WHERE host_id=? AND session_id IN (?)`, "host", strings.Repeat("a", 64)).Scan(&id, &parent, &unused, &detail); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(detail, "ai_usage_session (host_id=? AND session_id=?)") {
+		t.Fatalf("query reads outside listed sessions: %s", detail)
+	}
+	now := time.Now().UTC()
+	listed := strings.Repeat("a", 64)
+	unlisted := strings.Repeat("b", 64)
+	usage := []model.AIUsage{
+		{ID: strings.Repeat("c", 64), Session: listed, Kind: "codex", Model: "priced", At: now, Source: "otlp", Tokens: model.Tokens{Input: 1000000}},
+		{ID: strings.Repeat("d", 64), Session: unlisted, Kind: "codex", Model: "priced", At: now, Source: "otlp", Tokens: model.Tokens{Input: 9000000}},
+	}
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{{ID: listed, Kind: "codex", At: now, Source: "otlp"}}, Usage: usage}}); err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := s.AgentsWithSummary("host", map[string]model.AIPrice{"priced": {Input: 1}})
+	if err != nil || len(sessions) != 1 || sessions[0].APIEquivalentUSD != 1 {
+		t.Fatalf("bounded summary: %+v %v", sessions, err)
+	}
+}
+
+func TestAgentBranchFromCachedWorktree(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "branch.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	id := strings.Repeat("a", 64)
+	root := filepath.Join(t.TempDir(), "trees")
+	tree := filepath.Join(root, "demo", "feature")
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{{ID: id, Kind: "codex", Worktree: tree, At: now, Source: "otlp"}}}, Worktrees: []model.WorktreeEntry{{Root: root, Project: "demo", Name: "feature", Path: tree, Branch: "feature/preview"}}}); err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := s.AgentsWithSummary("host", nil)
+	if err != nil || len(sessions) != 1 || sessions[0].Branch != "feature/preview" || !strings.Contains(sessions[0].Label, "feature/preview") {
+		t.Fatalf("session branch: %+v %v", sessions, err)
+	}
+	detail, err := s.SessionDetail("host", id, nil)
+	if err != nil || detail.Session.Branch != "feature/preview" || detail.Session.Label != sessions[0].Label {
+		t.Fatalf("detail branch: %+v %v", detail.Session, err)
+	}
+}
+
 func TestProcessSessionSnapshot(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "process.db"))
 	if err != nil {

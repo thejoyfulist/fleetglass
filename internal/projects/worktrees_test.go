@@ -40,7 +40,7 @@ func TestScanWorktreesReportsMergedIdleSize(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	items := ScanWorktrees(ctx, []string{root}, nil, nil)
-	if len(items) != 1 || items[0].Merged == nil || !*items[0].Merged || !items[0].Reclaimable || !items[0].SizeComplete || items[0].SizeBytes < 7 || items[0].LastCommitAt.IsZero() {
+	if len(items) != 1 || items[0].Branch != "feature" || items[0].Merged == nil || !*items[0].Merged || !items[0].Reclaimable || !items[0].SizeComplete || items[0].SizeBytes < 7 || items[0].LastCommitAt.IsZero() {
 		t.Fatalf("worktree inventory: %+v", items)
 	}
 }

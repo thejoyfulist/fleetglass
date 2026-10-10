@@ -31,6 +31,7 @@ func Open(path string) (*Store, error) {
 		`CREATE TABLE IF NOT EXISTS ai_sessions(host_id TEXT NOT NULL,id TEXT NOT NULL,at_ns INTEGER NOT NULL,source TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(host_id,id))`,
 		`CREATE TABLE IF NOT EXISTS ai_usage(host_id TEXT NOT NULL,id TEXT NOT NULL,session_id TEXT NOT NULL,at_ns INTEGER NOT NULL,source TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(host_id,id))`,
 		`CREATE INDEX IF NOT EXISTS ai_usage_time ON ai_usage(host_id,at_ns)`,
+		`CREATE INDEX IF NOT EXISTS ai_usage_session ON ai_usage(host_id,session_id)`,
 		`CREATE TABLE IF NOT EXISTS ai_usage_hourly(host_id TEXT NOT NULL,bucket_ns INTEGER NOT NULL,kind TEXT NOT NULL,model TEXT NOT NULL,project TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(host_id,bucket_ns,kind,model,project))`,
 		`CREATE TABLE IF NOT EXISTS ai_usage_daily(host_id TEXT NOT NULL,bucket_ns INTEGER NOT NULL,kind TEXT NOT NULL,model TEXT NOT NULL,project TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(host_id,bucket_ns,kind,model,project))`,
 		`CREATE TABLE IF NOT EXISTS ai_quotas(host_id TEXT NOT NULL,kind TEXT NOT NULL,window TEXT NOT NULL,at_ns INTEGER NOT NULL,data TEXT NOT NULL,PRIMARY KEY(host_id,kind,window,at_ns))`,

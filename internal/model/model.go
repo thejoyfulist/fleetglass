@@ -44,6 +44,7 @@ type WorktreeEntry struct {
 	Project        string    `json:"project"`
 	Name           string    `json:"name"`
 	Path           string    `json:"path"`
+	Branch         string    `json:"branch,omitempty"`
 	SizeBytes      int64     `json:"size_bytes"`
 	SizeComplete   bool      `json:"size_complete"`
 	CreatedAt      time.Time `json:"created_at,omitempty"`

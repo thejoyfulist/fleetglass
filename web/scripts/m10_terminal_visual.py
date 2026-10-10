@@ -54,6 +54,31 @@ def inspect(page, width):
       return [...new Set(errors)];
     }""", width)
 
+def inspect_sticky_tabs(page):
+    page.evaluate("""() => {
+      if (document.documentElement.scrollHeight <= innerHeight) {
+        document.querySelector('main').style.minHeight = `${innerHeight * 2}px`;
+      }
+    }""")
+    page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
+    page.wait_for_timeout(100)
+    return page.evaluate("""() => {
+      const row = document.querySelector('.terminal-tabs');
+      const rect = row.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const hit = document.elementFromPoint(x, y);
+      const errors = [];
+      if (window.scrollY < 1) errors.push('page did not scroll');
+      if (rect.top < -1 || rect.bottom > innerHeight + 1) errors.push('tab row outside viewport');
+      if (!row.contains(hit)) errors.push('tab row covered by content');
+      if (innerWidth < 700 && row.scrollWidth > row.clientWidth + 1) {
+        row.scrollLeft = row.scrollWidth;
+        if (row.scrollLeft < 1) errors.push('tab row cannot scroll horizontally');
+      }
+      return errors;
+    }""")
+
 def main():
     server=ThreadingHTTPServer(("127.0.0.1",0),Handler)
     threading.Thread(target=server.serve_forever,daemon=True).start()
@@ -78,6 +103,8 @@ def main():
                         if detail_requests: errors.append(f"{theme}: overview requested session details: {len(detail_requests)}")
                     errors.extend(f"{view}-{theme}: {e}" for e in inspect(page,1440))
                     page.screenshot(path=str(OUT/f"{view}-{theme}.png"),full_page=True)
+                    if view in ("overview", "agents"):
+                        errors.extend(f"{view}-{theme}-desktop: {e}" for e in inspect_sticky_tabs(page))
                     if view=="machine":
                         for section in SECTIONS:
                             page.get_by_role('button',name=section,exact=True).first.click()
@@ -105,14 +132,17 @@ def main():
                 page.close()
                 mobile=browser.new_page(viewport={"width":390,"height":844},device_scale_factor=1)
                 mobile.add_init_script("window.localStorage.setItem('fg-theme', '%s');window.EventSource=class {constructor(){setTimeout(()=>this.onopen?.(),20)} addEventListener(){} close(){}};"%theme)
-                mobile.goto(f"http://127.0.0.1:{server.server_port}/",wait_until="networkidle")
-                errors.extend(f"overview-{theme}-mobile: {e}" for e in inspect(mobile,390))
-                mobile.screenshot(path=str(OUT/f"overview-{theme}-mobile.png"),full_page=True)
+                for view in ("overview", "agents"):
+                    mobile.goto(f"http://127.0.0.1:{server.server_port}/{'' if view=='overview' else view}",wait_until="networkidle")
+                    errors.extend(f"{view}-{theme}-mobile: {e}" for e in inspect(mobile,390))
+                    if view == "overview":
+                        mobile.screenshot(path=str(OUT/f"overview-{theme}-mobile.png"),full_page=True)
+                    errors.extend(f"{view}-{theme}-mobile: {e}" for e in inspect_sticky_tabs(mobile))
                 mobile.close()
             browser.close()
     finally:
         server.shutdown();server.server_close()
     if errors: raise AssertionError('\n'.join(errors)+f"\nScreenshots: {OUT}")
-    print(f"Terminal visual checks passed for {len(VIEWS)+len(SECTIONS)} views in both themes at 1440x900, plus mobile overview; screenshots: {OUT}")
+    print(f"Terminal visual checks passed for {len(VIEWS)+len(SECTIONS)} views in both themes at 1440x900, plus mobile overview and sticky tabs on overview/agents at both sizes; screenshots: {OUT}")
 
 if __name__=='__main__': main()

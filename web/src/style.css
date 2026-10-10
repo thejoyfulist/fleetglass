@@ -1316,5 +1316,19 @@ body{background:var(--ground);font:12.5px/1.5 var(--mono);padding:20px 16px 40px
 .terminal-status .terminal-filter{white-space:nowrap}.terminal-status .terminal-filter button:not([aria-pressed="true"]){display:none}
 .terminal-status .terminal-filter:focus-within button,.terminal-status .terminal-filter:hover button{display:inline}
 .terminal-table-scroll .terminal-bar{white-space:nowrap}
+/* Keep the terminal controls visible while the document scrolls. */
+.shell{overflow:clip}
+.terminal-header{position:sticky;top:env(safe-area-inset-top, 0px);z-index:20;background:var(--solid);border-bottom:1px solid var(--hair)}
+.terminal-header .top{padding-bottom:6px}
+.terminal-tabs{margin-top:0;padding:3px 14px 10px;background:var(--solid)}
+.shell main section,.shell main [id]{scroll-margin-top:180px}
+@media(min-width:1100px){.terminal-footer{position:sticky;bottom:0;z-index:10;background:var(--solid);border-top:1px solid var(--hair);padding-top:8px}}
+@media(max-width:699px){
+  .terminal-header{display:contents}
+  .terminal-tabs{position:sticky;top:env(safe-area-inset-top, 0px);z-index:20;display:flex;flex-wrap:nowrap;align-items:center;gap:1ch;overflow-x:auto;scrollbar-width:thin;white-space:nowrap;padding:8px 14px;border-bottom:1px solid var(--hair)}
+  .terminal-tabs .tabs{flex:none;flex-wrap:nowrap;width:max-content;max-width:none}
+  .terminal-tabs .terminal-range,.terminal-tabs .terminal-theme{flex:none;margin:0}
+  .shell main section,.shell main [id]{scroll-margin-top:60px}
+}
 .core-track,.app-share,.bar,.meter{display:none!important}
 .stat-grid{display:block;margin:0}.stat-grid>div,.uptime-stats>div{display:flex;align-items:baseline;justify-content:flex-start;gap:2ch;padding:0!important;margin:0;border:0!important;background:none!important;min-height:0;box-shadow:none}.stat-grid>div>span,.uptime-stats>div>small{min-width:18ch;color:var(--ink2);font:inherit}.stat-grid>div>b,.uptime-stats>div>b{font:inherit;color:var(--ink);overflow-wrap:anywhere}.uptime-stats{display:block;margin:.5em 0}.observation-summary strong,.fleet-stat strong,.app-intro strong{font:700 14px/1.5 var(--mono)}.observation-summary,.fleet-stat,.app-intro{min-height:0;padding:13px 1.2ch 8px}.observation-summary p,.fleet-stat span,.app-intro p{margin:.25em 0;font:inherit}.app-intro{margin-bottom:12px;display:block}.app-intro>div{display:flex;flex-direction:row;gap:2ch}.terminal-daily-bars{display:flex;gap:1ch;white-space:nowrap;max-width:100%;overflow-x:auto}.app-filters input[type="search"],.terminal-filters input[type="search"]{font:inherit;background:var(--solid);border:0;border-bottom:1px solid var(--edge);color:var(--ink);width:16ch;padding:0 .5ch}.app-filters label,.terminal-filters label{display:inline-flex;align-items:center;gap:.5ch}
