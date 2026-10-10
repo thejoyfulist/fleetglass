@@ -4,8 +4,17 @@ import { messages, plural, setLanguage, t, unchangedTechnicalTerms, unchangedFre
 import { agentReason, changeDetail, resultDetail, quotaWindow } from "./data";
 import { insightDetail } from "./observations";
 import type { Insight, Session } from "./data";
+import { defaultPreferences } from "./preferences";
 
 describe("message catalog", () => {
+  it("defaults to English regardless of browser language", () => {
+    expect(defaultPreferences.language).toBe("en");
+    setLanguage("en");
+    expect(t("terminal.not_collected")).toBe("not collected");
+    setLanguage("fr");
+    expect(t("terminal.not_collected")).toBe("non collecté");
+    setLanguage("en");
+  });
   it("has a French message for every English message", () => {
     for (const [key, [en, fr]] of Object.entries(messages)) {
       expect(en.length, key).toBeGreaterThan(0);
@@ -16,7 +25,7 @@ describe("message catalog", () => {
     }
   });
   it("contains no unused keys", () => {
-    const source = ["main.tsx", "observations.tsx", "charts.tsx", "preferences.tsx", "data.ts"]
+    const source = ["main.tsx", "terminal.tsx", "observations.tsx", "charts.tsx", "preferences.tsx", "data.ts"]
       .map(file => readFileSync(new URL(file, import.meta.url), "utf8")).join("\n");
     const mappings = readFileSync(new URL("i18n.ts", import.meta.url), "utf8")
       .split("export type MessageKey =")[1];

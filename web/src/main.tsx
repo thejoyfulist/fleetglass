@@ -40,9 +40,7 @@ import {
   quotaWindow,
   resetTime,
   result,
-  saveTheme,
   shortDate,
-  themePreference,
   total,
   value,
 } from "./data";
@@ -78,15 +76,18 @@ import { ProjectsView, StorageView, InsightsPanel, insightDetail } from "./obser
 import { defaultPreferences, hasPreferences, readPreferences, savePreferences, useCockpitLanguage, SettingsView, ShareView, Explain, formatAppCPU, t } from "./preferences";
 import type { Preferences } from "./preferences";
 import { activeLanguage, choiceLabel, navigationLabels, plural, sectionLabels, setLanguage, t as message } from "./i18n";
+import { TerminalOverview } from "./terminal";
 import type { MessageKey } from "./i18n";
 import "./tokens.css";
 import "./style.css";
 
-type View = "overview" | "fleet" | "agents" | "apps" | "projects" | "machine" | "storage" | "services" | "system" | "changes" | "costs" | "uptime" | "settings" | "share";
+type View = "overview" | "fleet" | "agents" | "apps" | "projects" | "machine" | "storage" | "services" | "system" | "changes" | "costs" | "uptime" | "settings" | "share" | "glossary";
 const views: View[] = ["overview", "fleet", "agents", "apps", "projects", "machine", "services", "system", "changes", "costs", "uptime"];
+const terminalViews: View[] = ["overview", "agents", "apps", "projects", "machine", "services", "system", "changes", "costs", "uptime"];
+function MonoMark() { return <svg className="terminal-logo" viewBox="0 0 64 64" aria-hidden="true"><rect x="9" y="9" width="28" height="28" rx="8" fill="currentColor" fillOpacity=".35"/><rect x="18" y="18" width="28" height="28" rx="8" fill="currentColor" fillOpacity=".62"/><rect x="27" y="27" width="28" height="28" rx="8" fill="currentColor"/></svg>; }
 function currentView(): View {
   const p = location.pathname.slice(1) as View;
-  return p === "storage" || p === "settings" || p === "share" || views.includes(p) ? p : "overview";
+  return p === "storage" || p === "settings" || p === "share" || p === "glossary" || views.includes(p) ? p : "overview";
 }
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(path, { credentials: "same-origin" });
@@ -110,17 +111,17 @@ function browserStorage(): Storage | null {
   }
 }
 function useTheme() {
-  const [theme, setTheme] = useState<"light" | "dark">(() =>
-    themePreference(
-      browserStorage(),
-      window.matchMedia("(prefers-color-scheme: dark)").matches,
-    ),
-  );
+  const [mode, setMode] = useState<"system" | "light" | "dark">(() => {
+    try { const saved=browserStorage()?.getItem("fg-theme"); return saved==="light"||saved==="dark"?saved:"system"; } catch { return "system"; }
+  });
+  const [systemDark,setSystemDark]=useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
+  useEffect(() => { const media=window.matchMedia("(prefers-color-scheme: dark)"); const update=()=>setSystemDark(media.matches); media.addEventListener("change",update); return ()=>media.removeEventListener("change",update); },[]);
+  const theme = mode === "system" ? (systemDark ? "dark" : "light") : mode;
   useEffect(() => {
     document.body.dataset.fg = theme;
-    saveTheme(browserStorage(), theme);
-  }, [theme]);
-  return [theme, setTheme] as const;
+    try { browserStorage()?.setItem("fg-theme", mode); } catch { /* Storage may be disabled. */ }
+  }, [theme, mode]);
+  return [theme, setMode, mode] as const;
 }
 function useCockpit(host: string, range: Range, authorized: boolean, currency: string) {
   const [overview, setOverview] = useState<Overview | null>(null),
@@ -870,7 +871,7 @@ function SystemView({data}:{data:ReturnType<typeof useCockpit>}) {
   const r=data.overview?.results || [];
   return <><PageHead title={t("ui.system.bc079")} subtitle={t("ui.security.backups.and.local.service.checks.from.t.46d5c")} /><div className="bento system-view">{matching(r,"security:").length ? <Security results={r} /> : null}{result(r,"recent_errors") ? <RecentErrors results={r} /> : null}{matching(r,"backup:").length ? <Backups results={r} /> : null}{matching(r,"status:").length || matching(r,"log_marker:").length || matching(r,"internal:").length ? <StatusFiles results={r} /> : null}{matching(r,"repository:").length || matching(r,"repositories:").length ? <Repositories results={r} /> : null}</div></>;
 }
-function OverviewView({
+export function OverviewView({
   data,
   range,
   setRange,
@@ -1795,7 +1796,7 @@ function PublicStatusPage() {
   const down=probes.filter(p=>p.state==="crit").length;
   const unknown=probes.filter(p=>p.state==="unknown"||p.state==="stale").length;
   const summary=down?plural(down,"public.down.one","public.down.many"):degraded?plural(degraded,"public.degraded.one","public.degraded.many"):unknown?plural(unknown,"public.unknown.one","public.unknown.many"):t("public.all_operational");
-  return <div className="status-page"><header className="status-header"><a href="/status" className="logo"><img className="lens" src="/favicon.svg" alt=""/>{t("ui.fleetglass.2e022")}</a><Segmented label={t("ui.theme.a797e")} choices={["Light","Dark"]} value={theme==="light"?"Light":"Dark"} onChange={x=>setTheme(x.toLowerCase() as "light"|"dark")}/></header>
+  return <div className="status-page"><header className="status-header"><a href="/status" className="logo"><MonoMark/>{t("ui.fleetglass.2e022")}</a><Segmented label={t("ui.theme.a797e")} choices={["Light","Dark"]} value={theme==="light"?"Light":"Dark"} onChange={x=>setTheme(x.toLowerCase() as "light"|"dark")}/></header>
     <main><div className="page-head"><div><h1>{t("ui.service.status.7efad")}</h1><p>{t("ui.availability.over.the.past.30.days.8e7a8")}</p></div></div>
     {error?<p role="alert">{error}</p>:null}
     {probes.length>0&&!error?<div className={`g status-banner ${down?"crit":degraded?"warn":unknown?"unknown":"ok"}`} role="status">{summary}</div>:null}
@@ -1803,7 +1804,7 @@ function PublicStatusPage() {
     </main></div>;
 }
 function App() {
-  const [theme, setTheme] = useTheme(),
+  const [theme, setTheme, themeMode] = useTheme(),
     [preferences, setPreferences] = useState<Preferences>(() => readPreferences()),
     [serverDefaults, setServerDefaults] = useState<Preferences>(defaultPreferences),
     [view, setView] = useState<View>(currentView),
@@ -1825,7 +1826,7 @@ function App() {
   useEffect(() => {
     if (auth !== "ready") return;
     get<{language:string;temperature:string;network:string;cpu:string;currency:string}>("/api/v1/display-defaults").then(raw => {
-      const defaults: Preferences = {language:raw.language === "fr" ? "fr" : "en",temperature:raw.temperature === "F" ? "F" : "C",network:raw.network === "bits" ? "bits" : "bytes",cpu:raw.cpu === "machine" ? "machine" : "core",currency:raw.currency || "USD",hiddenTabs:[],hiddenSections:[]};
+      const defaults: Preferences = {language:"en",temperature:raw.temperature === "F" ? "F" : "C",network:raw.network === "bits" ? "bits" : "bytes",cpu:raw.cpu === "machine" ? "machine" : "core",currency:raw.currency || "USD",hiddenTabs:[],hiddenSections:[]};
       setServerDefaults(defaults);
       if (!hadPreferences.current) setPreferences(defaults);
       else if (!hadCurrency.current) setPreferences(current => ({...current,currency:defaults.currency}));
@@ -1899,6 +1900,18 @@ function App() {
     setView(v);
     window.scrollTo(0, 0);
   };
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement || (e.target instanceof HTMLElement && e.target.isContentEditable)) return;
+      if (/^[1-9]$/.test(e.key) || e.key === "0") { e.preventDefault(); go(terminalViews[e.key === "0" ? 9 : Number(e.key)-1]); }
+      else if (e.key.toLowerCase() === "r") { e.preventDefault(); const ranges: Range[]=["1h","24h","7d","30d"]; setRange(ranges[(ranges.indexOf(range)+1)%ranges.length]); }
+      else if (e.key.toLowerCase() === "t") { e.preventDefault(); setTheme(themeMode === "system" ? "light" : themeMode === "light" ? "dark" : "system"); }
+      else if (e.key === "?") { e.preventDefault(); go("glossary"); }
+      else if (e.key === "/") { const filter=document.querySelector<HTMLInputElement>('main input[type="search"]'); if (filter) { e.preventDefault(); filter.focus(); } }
+    };
+    window.addEventListener("keydown",key);
+    return () => window.removeEventListener("keydown",key);
+  }, [range, themeMode]);
   const signIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -1929,76 +1942,13 @@ function App() {
   setLanguage(preferences.language);
   return (
     <div className="shell">
-      <header className="top g">
-        <div className="logo">
-          <img className="lens" src="/favicon.svg" alt="" />
-          {" "}{t("ui.fleetglass.2e022")}{" "}</div>
-        {auth === "ready" ? (
-          <>
-            <label className="host">
-              {" "}{t("ui.host.3960e")}{" "}
-              <select
-                aria-label={t("ui.host.3960e")}
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-              >
-                {hosts.map((h) => (
-                  <option key={h.host_id} value={h.host_id}>
-                    {h.host_id}{hosts.length>1?` · ${t(h.liveness === "live" ? "state.live" : h.liveness === "silent" ? "state.silent" : "state.offline")}`:""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <nav className="tabs" aria-label={t("ui.views.24be6")}>
-              {views.filter(v=>(v!=="fleet"||hosts.length>1)&&!preferences.hiddenTabs.includes(v)).map((v) => (
-                <a
-                  href={v === "overview" ? "/" : `/${v}`}
-                  key={v}
-                  aria-current={view === v || (v === "machine" && view === "storage") ? "page" : undefined}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    go(v);
-                  }}
-                >
-                  {t(navigationLabels[v as keyof typeof navigationLabels], preferences.language)}
-                </a>
-              ))}
-            </nav>
-            <div className="top-actions"><button type="button" className="quiet" aria-current={view==="share"?"page":undefined} onClick={()=>go("share")}>{t("ui.share.09ca5",preferences.language)}</button><button type="button" className="quiet" aria-current={view==="settings"?"page":undefined} onClick={()=>go("settings")}>{t("ui.settings.c7f73",preferences.language)}</button></div>
-            <div className="sp" />
-            <button className="kbd" onClick={() => setPalette(true)} aria-label={t("ui.search.or.jump.to.commands.control.or.command.k.26860")} title={t("ui.search.or.jump.to.commands.ctrl.k.50228")}>
-              <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="m13 13 4 4" fill="none" stroke="currentColor" strokeWidth="1.6"/></svg><span>{t("ui.k.64d86")}</span>
-            </button>
-          </>
-        ) : (
-          <div className="sp" />
-        )}
-        <Segmented
-          label={t("ui.theme.a797e")}
-          choices={["Light", "Dark"]}
-          value={theme === "light" ? "Light" : "Dark"}
-          onChange={(choice) =>
-            setTheme(choice.toLowerCase() as "light" | "dark")
-          }
-        />
-        {auth === "ready" ? (
-          <>
-            <div className={`live ${stale ? "attention" : ""}`}>
-              {data.stream === "stale"
-                ? t("ui.connection.lost.62583")
-                : stale
-                  ? t("ui.stale.data.2e635")
-                  : data.stream === "connecting"
-                    ? t("ui.connecting.c1f3b")
-                    : t("ui.live.65c82")}{" "}
-              · <b>{age === null ? t("ui.waiting.33d30") : t("live.seconds_ago", {seconds:age})}</b>
-            </div>
-            {protectedServer ? (
-              <button className="quiet" onClick={signOut} aria-label={t("ui.sign.out.dc164")}>
-                {" "}{t("ui.sign.out.dc164")}{" "}</button>
-            ) : null}
-          </>
-        ) : null}
+      <div className="terminal-chrome" aria-label="Fleetglass window">
+        <div className="terminal-lights" aria-hidden="true"><i/><i/><i/></div>
+        <span className="terminal-window-title"><MonoMark/>{host || "fleetglass"} - fleetglass - {Math.max(40,Math.floor((typeof window !== "undefined" ? window.innerWidth : 1440)/7.5))}x{Math.max(20,Math.floor((typeof window !== "undefined" ? window.innerHeight : 900)/18))}</span>
+      </div>
+      <header className="top">
+        <div className="terminal-status"><MonoMark/><b>fleetglass {release?.version ?? ""}</b><span className="terminal-separator">│</span><label className="host">{t("ui.host.3960e")} <select aria-label={t("ui.host.3960e")} value={host} onChange={e=>setHost(e.target.value)}>{hosts.map(h=><option key={h.host_id} value={h.host_id}>{h.host_id}</option>)}</select></label><span className="terminal-separator">│</span><span>{t("terminal.status_up")} {t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_kernel")} {t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_load")} {value(result(data.overview?.results||[],"load"),"1m")?.toFixed(2) ?? t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{value(result(data.overview?.results||[],"cpu"),"core_count") ?? "—"} {t("terminal.label_threads")} · {value(result(data.overview?.results||[],"memory"),"total_bytes")===null?t("terminal.not_collected"):formatBytes(value(result(data.overview?.results||[],"memory"),"total_bytes"))}</span><span className="terminal-separator">│</span><span className="terminal-warn-count">{data.overview?.results.filter(x=>x.state==="warn").length ?? 0} WARN</span><span className="terminal-crit-count">{data.overview?.results.filter(x=>x.state==="crit").length ?? 0} CRIT</span><span>{data.stream === "stale" ? t("ui.connection.lost.62583") : stale ? t("ui.stale.data.2e635") : data.stream === "connecting" ? t("ui.connecting.c1f3b") : t("ui.live.65c82")}</span><span className="terminal-time">{new Date(tick).toLocaleString(preferences.language === "fr" ? "fr-FR" : "sv-SE",{dateStyle:"short",timeStyle:"medium",hour12:false})}</span>{protectedServer?<button type="button" className="quiet" onClick={signOut}>{t("ui.sign.out.dc164")}</button>:null}</div>
+        <div className="terminal-tabs"><nav className="tabs" aria-label={t("ui.views.24be6")}>{terminalViews.filter(v=>!preferences.hiddenTabs.includes(v)).map(v=>{const index=terminalViews.indexOf(v);return <button type="button" key={v} aria-pressed={view===v||(v==="machine"&&view==="storage")} onClick={()=>go(v)}>{index===9?0:index+1} {t(navigationLabels[v as keyof typeof navigationLabels], preferences.language).toLowerCase()}</button>})}<button type="button" className="terminal-search" onClick={()=>setPalette(true)} aria-label={t("ui.search.or.jump.to.commands.control.or.command.k.26860")} title={t("ui.search.or.jump.to.commands.ctrl.k.50228")}>{t("ui.k.64d86")}</button>{hosts.length>1?<button type="button" onClick={()=>go("fleet")}>{formatNumber(fleet.filter(h=>h.liveness==="live").length)} {t("ui.of.de04f")} {formatNumber(fleet.length)} {t("ui.hosts.reporting.57618")} · {formatNumber(fleet.filter(h=>h.liveness!=="live").length)} {t("ui.need.attention.c8806")} · {t("ui.view.fleet.8d8a0")}</button>:null}<button type="button" aria-pressed={view==="settings"} onClick={()=>go("settings")}>{t("ui.settings.c7f73",preferences.language).toLowerCase()}</button><button type="button" aria-pressed={view==="glossary"} onClick={()=>go("glossary")}>{t("terminal.glossary")}</button></nav><div className="terminal-range" role="group" aria-label={t("terminal.range")}>{t("terminal.range")} {(["1h","24h","7d","30d"] as Range[]).map(v=><button key={v} type="button" aria-pressed={range===v} onClick={()=>setRange(v)}>{v}</button>)}</div><div className="terminal-theme" role="group" aria-label={t("terminal.theme")}>{(["system","light","dark"] as const).map(mode=><button type="button" key={mode} aria-pressed={themeMode===mode} onClick={()=>setTheme(mode)}>{mode === "system" ? t("terminal.system") : mode === "light" ? t("terminal.light") : t("terminal.dark")}</button>)}</div></div>
       </header>
       {auth === "offline" ? (
         <main className="auth g"><h1>{t("pwa.offline")}</h1><p>{t("pwa.last_data", {at:(() => { try { const at = window.localStorage.getItem("fleetglass:last-data-at"); return at ? formatDateTime(at) : t("value.unknown"); } catch { return t("value.unknown"); } })()})}</p><button onClick={() => location.reload()}>{t("ui.retry.9f5cd")}</button></main>
@@ -2035,7 +1985,9 @@ function App() {
               <button onClick={() => void data.refresh()}>{t("ui.retry.9f5cd")}</button>
             </div>
           ) : null}
-          {view === "settings" ? (
+          {view === "glossary" ? (
+            <div className="terminal-grid"><section className="terminal-box terminal-span-12" aria-label={t("terminal.glossary")}><h2>{t("terminal.glossary")}</h2><div className="terminal-box-body"><p>{t("terminal.glossary_intro")}</p><p>{t("terminal.glossary_bar")}</p><p>{t("terminal.glossary_unknown")}</p><p className="terminal-warn">{t("terminal.glossary_warn")}</p><p className="terminal-crit">{t("terminal.glossary_crit")}</p></div></section></div>
+          ) : view === "settings" ? (
             <SettingsView preferences={preferences} onChange={changePreferences} onReset={() => changePreferences(serverDefaults)} />
           ) : !host ? (
             <div className="auth g">
@@ -2047,12 +1999,7 @@ function App() {
           ) : view === "fleet" && hosts.length>1 ? (
             <FleetView hosts={fleet} selectHost={setHost} go={go} />
           ) : view === "overview" ? (
-            <>{hosts.length>1?<div className="overview-fleet g"><span><b>{formatNumber(fleet.filter(h=>h.liveness==="live").length)}</b> {" "}{t("ui.of.de04f")}{" "}{formatNumber(fleet.length)} {" "}{t("ui.hosts.reporting.57618")}</span><span>{formatNumber(fleet.filter(h=>h.liveness!=="live").length)} {" "}{t("ui.need.attention.c8806")}</span><button onClick={()=>go("fleet")}>{t("ui.view.fleet.8d8a0")}</button></div>:null}<OverviewView
-              data={data}
-              range={range}
-              setRange={setRange}
-              go={go}
-            /></>
+            <TerminalOverview data={data} go={go} />
           ) : view === "agents" ? (
             <AgentsView data={data} />
 		  ) : view === "apps" ? (
@@ -2083,7 +2030,7 @@ function App() {
           selectHost={setHost}
         />
       ) : null}
-      {auth === "ready" && release ? <footer className="release-footer"><span>{t("release.version", {version:release.version})}</span>{release.update_check_enabled && release.latest && release.latest !== release.version ? <span>{t("release.update", {version:release.latest})}</span> : null}</footer> : null}
+      {auth === "ready" ? <footer className="terminal-footer"><span><kbd>1-9/0</kbd>{t("terminal.views")}</span><span><kbd>r</kbd>{t("terminal.range")} {range}</span><span><kbd>/</kbd>{t("terminal.filter")}</span><span><kbd>?</kbd>{t("terminal.glossary")}</span><span><kbd>t</kbd>{t("terminal.theme")}</span><span className="terminal-footer-end">{release?t("release.version",{version:release.version}):""} · {release?.update_check_enabled&&release.latest&&release.latest!==release.version?t("release.update",{version:release.latest}):""} · {t("terminal.read_only")} · {data.stream} · {age===null?"—":t("live.seconds_ago",{seconds:age})}</span></footer> : null}
     </div>
   );
 }

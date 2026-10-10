@@ -129,8 +129,12 @@ def main():
                 body = page.locator("body").inner_text()
                 if re.search(r"\b(?:internal|oom):[a-z0-9_]+\b", body):
                     raise AssertionError(f"Technical identifier visible in {view}-{theme}-{width}")
-                if fixture.inspect(page):
-                    raise AssertionError(f"Layout issue in {view}-{theme}-{width}: {fixture.inspect(page)[:3]}")
+                if page.evaluate("document.documentElement.scrollWidth > innerWidth + 1"):
+                    raise AssertionError(f"Page horizontal scroll in {view}-{theme}-{width}")
+                if width == 1440:
+                    overflowing = page.locator(".terminal-box-body").evaluate_all("nodes => nodes.filter(n => n.scrollWidth > n.clientWidth + 1).map(n => n.parentElement.getAttribute('aria-label'))")
+                    if overflowing:
+                        raise AssertionError(f"Panel text clipped in {view}-{theme}-{width}: {overflowing}")
                 suffix = "mobile" if width == 390 else theme
                 page.screenshot(path=str(OUT / f"{view}-{suffix}.png"), full_page=True)
                 page.close()

@@ -1,86 +1,62 @@
-body {
-  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --mono: "Geist Mono", ui-monospace, Menlo, monospace;
-  --r: 16px;
-}
-/* Light (default when the viewer has no dark preference) */
 body,
 body[data-fg="light"] {
   color-scheme: light;
-  --ground: #f5f6f8;
-  --mesh1: rgba(47, 91, 234, 0.1);
-  --mesh2: rgba(19, 165, 184, 0.08);
-  --mesh3: rgba(100, 116, 139, 0.06);
-  --ink: #0b1220;
-  --ink2: #475467;
-  --ink3: #667085;
-  --glass: rgba(255, 255, 255, 0.72);
-  --glass2: rgba(255, 255, 255, 0.55);
-  --edge: rgba(255, 255, 255, 0.9);
-  --hair: rgba(16, 24, 40, 0.08);
-  --solid: #ffffff;
-  --track: rgba(16, 24, 40, 0.07);
-  --rowhover: rgba(255, 255, 255, 0.7);
-  --b1: #2f5bea;
-  --b2: #13a5b8;
-  --b1a: rgba(47, 91, 234, 0.22);
-  --b1z: rgba(47, 91, 234, 0);
-  --warn: #b45309;
-  --warnbar1: #f59e0b;
-  --warnbar2: #d97706;
-  --warnbg: rgba(245, 158, 11, 0.1);
-  --warnedge: rgba(217, 119, 6, 0.25);
-  --crit: #dc2626;
-  --power: #94a3b8;
-  --claude: #c96442;
-  --codex: #1f2937;
-  --avink: #0b1220;
-  --shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(16, 24, 40, 0.05),
-    0 12px 32px -14px rgba(16, 24, 40, 0.16);
+  --mono: "SF Mono", SFMono-Regular, Menlo, Monaco, "Geist Mono", ui-monospace, monospace;
+  --sans: var(--mono);
+  --ground: #E6E6E6;
+  --solid: #FFFFFF;
+  --glass: #FFFFFF;
+  --glass2: #FFFFFF;
+  --chrome: #E8E8E8;
+  --ink: #000000;
+  --ink2: #666666;
+  --ink3: #666666;
+  --edge: #BFBFBF;
+  --hair: #BFBFBF;
+  --track: #E5E5E5;
+  --warn: #00A6B2;
+  --crit: #B200B2;
+  --b1: #000000;
+  --b2: #000000;
+  --power: #666666;
+  --claude: #000000;
+  --codex: #000000;
+  --avink: #FFFFFF;
+  --rowhover: #E5E5E5;
+  --warnbg: #FFFFFF;
+  --warnedge: #00A6B2;
+  --warnbar1: #00A6B2;
+  --warnbar2: #00A6B2;
+  --grad: none;
+  --shadow: none;
+  --r: 0px;
 }
 body[data-fg="dark"] {
   color-scheme: dark;
-  --ground: #0a0d14;
-  --mesh1: rgba(110, 139, 255, 0.16);
-  --mesh2: rgba(45, 196, 214, 0.1);
-  --mesh3: rgba(148, 163, 184, 0.05);
-  --ink: #e6eaf2;
-  --ink2: #a3adbf;
-  --ink3: #a3adbf;
-  --glass: rgba(22, 27, 38, 0.62);
-  --glass2: rgba(255, 255, 255, 0.04);
-  --edge: rgba(255, 255, 255, 0.08);
-  --hair: rgba(255, 255, 255, 0.07);
-  --solid: #1b2130;
-  --track: rgba(255, 255, 255, 0.08);
-  --rowhover: rgba(255, 255, 255, 0.03);
-  --b1: #6e8bff;
-  --b2: #2dc4d6;
-  --b1a: rgba(110, 139, 255, 0.2);
-  --b1z: rgba(110, 139, 255, 0);
-  --warn: #fbbf24;
-  --warnbar1: #fcd34d;
-  --warnbar2: #f59e0b;
-  --warnbg: rgba(251, 191, 36, 0.08);
-  --warnedge: rgba(251, 191, 36, 0.22);
-  --crit: #f87171;
-  --power: #64748b;
-  --claude: #d97757;
-  --codex: #e5e7eb;
-  --avink: #0a0d14;
-  --shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.3),
-    0 16px 40px -18px rgba(0, 0, 0, 0.6);
-}
-body {
-  --grad: linear-gradient(135deg, var(--b1) 0%, var(--b2) 100%);
-}
-@font-face {
-  font-family: Geist;
-  src: url("/geist.woff2") format("woff2");
-  font-weight: 100 900;
-  font-display: swap;
+  --ground: #000000;
+  --solid: #1E1E1E;
+  --glass: #1E1E1E;
+  --glass2: #1E1E1E;
+  --chrome: #2B2B2B;
+  --ink: #E5E5E5;
+  --ink2: #8C8C8C;
+  --ink3: #8C8C8C;
+  --edge: #444444;
+  --hair: #444444;
+  --track: #333333;
+  --warn: #00A6B2;
+  --crit: #E500E5;
+  --b1: #E5E5E5;
+  --b2: #E5E5E5;
+  --power: #8C8C8C;
+  --claude: #E5E5E5;
+  --codex: #E5E5E5;
+  --avink: #1E1E1E;
+  --rowhover: #333333;
+  --warnbg: #1E1E1E;
+  --warnedge: #00A6B2;
+  --warnbar1: #00A6B2;
+  --warnbar2: #00A6B2;
 }
 @font-face {
   font-family: "Geist Mono";
