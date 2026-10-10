@@ -207,10 +207,18 @@ func (a *API) mcpCall(name, host, figure, at string, port int) ([]byte, string) 
 		answer = map[string]any{"host": host, "port": port, "listeners": listeners, "processes": rows, "note": "Process attribution covers configured project roots only; an empty result is not proof that the port is free."}
 	case "host_status":
 		counts := map[string]int{}
+		var uptime any
+		var kernel, arch string
 		for _, v := range overview.Results {
 			counts[string(v.State)]++
+			if v.Name == "host" {
+				if seconds, ok := v.Values["uptime_seconds"]; ok {
+					uptime = seconds
+				}
+				kernel, arch = v.Fields["kernel_release"], v.Fields["arch"]
+			}
 		}
-		answer = map[string]any{"host": host, "at": overview.At, "liveness": overview.Liveness, "checks": counts, "agents": len(overview.Agents)}
+		answer = map[string]any{"host": host, "at": overview.At, "liveness": overview.Liveness, "checks": counts, "agents": len(overview.Agents), "uptime_seconds": uptime, "kernel_release": kernel, "arch": arch}
 	}
 	b, e := json.Marshal(answer)
 	if e != nil {

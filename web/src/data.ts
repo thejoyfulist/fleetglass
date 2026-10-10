@@ -14,6 +14,13 @@ export interface Result {
 }
 export interface Session {
   id: string;
+  label?: string;
+  branch?: string;
+  api_equivalent_usd?: number;
+  api_money?: Money;
+  usage_measured?: boolean;
+  speed_tokens_per_second?: number;
+  speed_method?: string;
   kind: string;
   model?: string;
   project?: string;
@@ -82,6 +89,7 @@ export interface Quota {
 }
 export interface Cost {
   project: string;
+  model?: string;
   method: string;
   usd?: number;
   amount?: number; currency?: string; money?: Money;

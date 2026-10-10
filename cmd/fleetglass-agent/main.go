@@ -111,7 +111,7 @@ func (a *agent) collect(slow bool) []model.Result {
 	out := []model.Result{}
 	add := func(name string, fn func(context.Context) []model.Result) {
 		cadence := 15
-		if name == "ports" || name == "tls" || name == "helper" || name == "journal" || name == "updates" || name == "sensitive" || name == "managed" {
+		if name == "ports" || name == "tls" || name == "dns" || name == "helper" || name == "journal" || name == "updates" || name == "sensitive" || name == "managed" {
 			cadence = 300
 		}
 		for _, result := range a.isolated(name, fn) {
@@ -147,6 +147,9 @@ func (a *agent) collect(slow bool) []model.Result {
 		a.pendingProbes = append(a.pendingProbes, sample)
 	}
 	if slow {
+		if len(a.c.DNSProbeNames) > 0 {
+			add("dns", func(ctx context.Context) []model.Result { return probe.DNS(ctx, a.c.DNSProbeNames, nil) })
+		}
 		add("ports", func(context.Context) []model.Result { return probe.Ports(a.c.ProcRoot) })
 		add("tls", func(ctx context.Context) []model.Result { return probe.TLS(ctx, a.c.TLSDomains) })
 		add("helper", a.helper)

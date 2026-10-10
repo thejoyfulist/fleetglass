@@ -41,6 +41,27 @@ func TestHTTPProbeConfigAndStatusListenerDefault(t *testing.T) {
 	}
 }
 
+func TestDNSProbeNamesValidation(t *testing.T) {
+	for _, tc := range []struct {
+		raw   string
+		valid bool
+	}{
+		{`{"dns_probe_names":["demo.example","resolver.test"]}`, true},
+		{`{"dns_probe_names":["http://demo.example"]}`, false},
+		{`{"dns_probe_names":["192.0.2.1"]}`, false},
+		{`{"dns_probe_names":["bad name"]}`, false},
+	} {
+		path := filepath.Join(t.TempDir(), "config.json")
+		if err := os.WriteFile(path, []byte(tc.raw), 0600); err != nil {
+			t.Fatal(err)
+		}
+		_, err := Load(path)
+		if (err == nil) != tc.valid {
+			t.Fatalf("configuration accepted=%t: %v", tc.valid, err)
+		}
+	}
+}
+
 func TestSubscriptionCurrenciesAndLegacyUSD(t *testing.T) {
 	for _, tc := range []struct {
 		data     string

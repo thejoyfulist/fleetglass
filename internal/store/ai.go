@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -109,6 +110,74 @@ func (s *Store) Agents(host string) ([]model.AgentSession, error) {
 	return s.agentsAt(host, time.Now())
 }
 
+func SessionLabel(v model.AgentSession) string {
+	location := v.Worktree
+	if location == "" {
+		location = v.Project
+	}
+	location = filepath.Base(strings.TrimRight(location, "/"))
+	if location == "." || location == "/" || location == "" {
+		location = "session"
+	}
+	short := v.ID
+	if len(short) > 8 {
+		short = short[:8]
+	}
+	label := v.Kind + " · " + location
+	if v.Branch != "" {
+		label += " · " + v.Branch
+	}
+	return label + " · " + short
+}
+
+// AgentsWithSummary reads usage once for the full list, avoiding per-session API requests.
+func (s *Store) AgentsWithSummary(host string, overrides map[string]model.AIPrice) ([]model.AgentSession, error) {
+	sessions, err := s.Agents(host)
+	if err != nil {
+		return nil, err
+	}
+	index := make(map[string]int, len(sessions))
+	for i := range sessions {
+		index[sessions[i].ID] = i
+	}
+	rows, err := s.DB.Query(`SELECT data FROM ai_usage WHERE host_id=?`, host)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	prices := effectivePrices(overrides)
+	latest := map[string]time.Time{}
+	now := time.Now()
+	for rows.Next() {
+		var raw string
+		if err = rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		var u model.AIUsage
+		if json.Unmarshal([]byte(raw), &u) != nil {
+			continue
+		}
+		i, ok := index[u.Session]
+		if !ok {
+			continue
+		}
+		v := &sessions[i]
+		if u.Tokens.Input+u.Tokens.Output+u.Tokens.CacheRead+u.Tokens.CacheWrite > 0 {
+			v.UsageMeasured = true
+		}
+		if price, ok := modelPrice(prices, u.Model); ok {
+			v.APIEquivalentUSD += (float64(u.Tokens.Input)*price.Input + float64(u.Tokens.Output)*price.Output + float64(u.Tokens.CacheWrite)*price.CacheWrite + float64(u.Tokens.CacheRead)*price.CacheRead) / 1e6
+		}
+		if u.OutputTokensPerSecond > 0 && now.Sub(u.At) <= time.Hour && u.At.After(latest[u.Session]) {
+			rate := u.OutputTokensPerSecond
+			v.SpeedTokensPerSecond = &rate
+			v.SpeedMethod = u.SpeedMethod
+			latest[u.Session] = u.At
+		}
+	}
+	return sessions, rows.Err()
+}
+
 func (s *Store) agentsAt(host string, now time.Time) ([]model.AgentSession, error) {
 	rows, e := s.DB.Query(`SELECT data FROM ai_sessions WHERE host_id=? AND (at_ns>=? OR source='process') ORDER BY at_ns DESC LIMIT 1000`, host, now.Add(-24*time.Hour).UnixNano())
 	if e != nil {
@@ -123,6 +192,7 @@ func (s *Store) agentsAt(host string, now time.Time) ([]model.AgentSession, erro
 			return nil, e
 		}
 		if json.Unmarshal([]byte(b), &v) == nil {
+			v.Label = SessionLabel(v)
 			// A persisted session can outlive its last agent report. Without a
 			// matched PID, its age alone is enough to establish that it ended.
 			if (v.Source == "log" || v.Source == "otlp") && v.PID == 0 && now.Sub(v.At) > 30*time.Minute {
@@ -285,6 +355,13 @@ func modelPrice(prices map[string]model.AIPrice, modelID string) (model.AIPrice,
 }
 
 func (s *Store) Costs(host, rangeName string, overrides map[string]model.AIPrice, subs []model.AISubscription) ([]map[string]any, error) {
+	return s.CostsBy(host, rangeName, "project", overrides, subs)
+}
+
+func (s *Store) CostsBy(host, rangeName, by string, overrides map[string]model.AIPrice, subs []model.AISubscription) ([]map[string]any, error) {
+	if by != "project" && by != "model" {
+		return nil, fmt.Errorf("invalid cost grouping")
+	}
 	d, e := duration(rangeName)
 	if e != nil {
 		return nil, e
@@ -313,6 +390,9 @@ func (s *Store) Costs(host, rangeName string, overrides map[string]model.AIPrice
 			continue
 		}
 		project := u.Project
+		if by == "model" {
+			project = u.Model
+		}
 		if project == "" {
 			project = "unknown"
 		}
@@ -369,6 +449,9 @@ func (s *Store) Costs(host, rangeName string, overrides map[string]model.AIPrice
 				method = "subscription_allocated"
 			}
 			row := map[string]any{"project": project, "amount": usd, "currency": currency, "method": method}
+			if by == "model" {
+				row["model"] = project
+			}
 			if currency == "USD" {
 				row["usd"] = usd
 			}

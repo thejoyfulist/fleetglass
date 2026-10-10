@@ -127,10 +127,10 @@ function useCockpit(host: string, range: Range, authorized: boolean, currency: s
     [agents, setAgents] = useState<Session[]>([]),
     [usage, setUsage] = useState<Usage[]>([]),
     [sessionUsage, setSessionUsage] = useState<Usage[]>([]),
-    [sessionDetails,setSessionDetails] = useState<Record<string,SessionDetail>>({}),
     [models, setModels] = useState<Usage[]>([]),
     [quotas, setQuotas] = useState<Quota[]>([]),
     [costs, setCosts] = useState<Cost[]>([]),
+    [modelCosts, setModelCosts] = useState<Cost[]>([]),
     [speed, setSpeed] = useState<SpeedSummary[]>([]),
     [subscriptions, setSubscriptions] = useState<SubscriptionComparison[]>([]),
     [worktrees,setWorktrees] = useState<WorktreesView>({worktrees:[],reclaimable_bytes:0,at:""}),
@@ -160,6 +160,7 @@ function useCockpit(host: string, range: Range, authorized: boolean, currency: s
         `${base}/ai/usage?range=${range}&by=session`,
         `${base}/ai/quotas`,
         `${base}/ai/costs?range=${range}&display_currency=${currency}`,
+        `${base}/ai/costs?range=${range}&by=model&display_currency=${currency}`,
         `${base}/ai/speed?range=1h`,
         `${base}/ai/subscriptions?display_currency=${currency}`,
         `${base}/worktrees`,
@@ -170,21 +171,18 @@ function useCockpit(host: string, range: Range, authorized: boolean, currency: s
 		`${base}/traffic`,
 		`${base}/observations`,
       ];
-      const [o, a, u, m, s, q, c, sp, sub, wt, ch, en, pr, ap, tr, obs] = await Promise.all(
+      const [o, a, u, m, s, q, c, mc, sp, sub, wt, ch, en, pr, ap, tr, obs] = await Promise.all(
         paths.map((p) => get<unknown>(p)),
       );
       if (request !== requestId.current) return;
       setOverview(o as Overview);
       setAgents(a as Session[]);
-      void Promise.allSettled((a as Session[]).slice(0,8).map(session=>get<SessionDetail>(`${base}/agents/${encodeURIComponent(session.id)}?display_currency=${currency}`))).then(details=>{
-        if(request!==requestId.current)return;
-        setSessionDetails(Object.fromEntries(details.flatMap((item,index)=>item.status==="fulfilled"?[[((a as Session[])[index]).id,item.value]]:[])));
-      });
       setUsage(u as Usage[]);
       setModels(m as Usage[]);
       setSessionUsage(s as Usage[]);
       setQuotas(q as Quota[]);
       setCosts(c as Cost[]);
+      setModelCosts(mc as Cost[]);
       setSpeed(sp as SpeedSummary[]);
       setSubscriptions(sub as SubscriptionComparison[]);
       setWorktrees(wt as WorktreesView);
@@ -207,10 +205,10 @@ function useCockpit(host: string, range: Range, authorized: boolean, currency: s
     setAgents([]);
     setUsage([]);
     setSessionUsage([]);
-    setSessionDetails({});
     setModels([]);
     setQuotas([]);
     setCosts([]);
+    setModelCosts([]);
     setSpeed([]);
     setSubscriptions([]);
     setWorktrees({worktrees:[],reclaimable_bytes:0,at:""});
@@ -302,10 +300,10 @@ function useCockpit(host: string, range: Range, authorized: boolean, currency: s
     agents,
     usage,
     sessionUsage,
-    sessionDetails,
     models,
     quotas,
     costs,
+    modelCosts,
     speed,
     subscriptions,
     worktrees,
@@ -525,7 +523,7 @@ function AgentTable({
     <>
 
       {!compact && detail?<section className="g t session-detail" id="session-detail"><div className="h"><h2>{t("session.title",{agent:agentName(detail.session.kind)})}</h2><span className="src">{detail.session.model||t("value.unknown_model")}</span></div>
-        <TerminalKV rows={[[t("session.start"),hasDate(detail.session.started_at)?formatDateTime(detail.session.started_at):t("value.unknown")],[t("session.end"),hasDate(detail.session.ended_at)?formatDateTime(detail.session.ended_at):t("session.running")],[t("session.duration"),hasDate(detail.session.started_at)?formatDuration(Math.max(0,(new Date(hasDate(detail.session.ended_at)?detail.session.ended_at:Date.now()).getTime()-new Date(detail.session.started_at).getTime())/1000)):t("value.unknown")],[t("ui.cpu.ff221"),detail.session.cpu_seconds?formatDuration(detail.session.cpu_seconds):t("value.unknown")],[t("ui.memory.89c8a"),detail.session.peak_rss_bytes?formatBytes(detail.session.peak_rss_bytes):t("value.unknown")],[t("ui.tokens.c38c6"),detail.usage_measured?formatTokens(total(detail.tokens)):t("value.unknown")],[t("ui.project.f6f4d"),detail.session.project||t("value.unknown")]]}/>
+        <TerminalKV rows={[[t("session.start"),hasDate(detail.session.started_at)?formatDateTime(detail.session.started_at):t("value.unknown")],[t("session.end"),hasDate(detail.session.ended_at)?formatDateTime(detail.session.ended_at):t("session.running")],[t("session.duration"),hasDate(detail.session.started_at)?formatDuration(Math.max(0,(new Date(hasDate(detail.session.ended_at)?detail.session.ended_at:Date.now()).getTime()-new Date(detail.session.started_at).getTime())/1000)):t("value.unknown")],[t("ui.cpu.ff221"),detail.session.cpu_seconds?formatDuration(detail.session.cpu_seconds):t("value.unknown")],[t("ui.memory.89c8a"),detail.session.peak_rss_bytes?formatBytes(detail.session.peak_rss_bytes):t("value.unknown")],[t("ui.tokens.c38c6"),detail.usage_measured?formatTokens(total(detail.tokens)):t("value.unknown")],[t("ui.project.f6f4d"),detail.session.project||t("value.unknown")],["Session ID",detail.session.id]]}/>
         <h3>{t("session.spawned")}</h3>{detail.processes.length?<ul>{detail.processes.map(p=><li key={p.pid}>{p.name} · {p.pid} · {formatBytes(p.memory_bytes)}{p.left_behind?` · ${t("project.left_behind")}`:""}</li>)}</ul>:<p>{t("session.no_spawned")}</p>}
         <SpeedPanel speed={detail.speed} host={host} session={detail.session.id}/>
       </section>:null}
@@ -547,7 +545,7 @@ function AgentTable({
                 ]
           }
           rows={agents.map((a) => {
-            const first = <button type="button" className="terminal-link" onClick={()=>choose(a.id)}>{a.id.slice(0,16)}</button>;
+            const first = <button type="button" className="terminal-link" onClick={()=>choose(a.id)}>{a.label??a.id.slice(0,16)}</button>;
             return compact
               ? [
                   first,
@@ -1022,7 +1020,7 @@ function AgentsView({ data }: { data: ReturnType<typeof useCockpit> }) {
         (kind === "All" || a.kind === kind) &&
         (project === "All" || (a.project || t("value.unknown")) === project) &&
         (state === "All" || a.state === state) &&
-        `${a.id} ${a.project??""} ${a.model??""}`.toLowerCase().includes(query.toLowerCase()),
+        `${a.id} ${a.label??""} ${a.project??""} ${a.model??""}`.toLowerCase().includes(query.toLowerCase()),
     );
   return (
     <>
@@ -1404,6 +1402,7 @@ function CostsView({
           <p className="foot">
             {" "}{data.subscriptions.some(s=>s.subscription_amount!=null || s.subscription_usd!==null)?t("ui.api.equivalent.is.an.estimate.not.a.bill.subscri.101cc"):t("subscription.no_config_foot")}{" "}</p>
         </Tile>
+        <Tile title="API equivalent by model" className="half"><TerminalTable heads={[t("terminal.label_model"),t("terminal.label_amount")]} right={[1]} rows={data.modelCosts.filter(c=>c.method==="api_equivalent").map(c=>[c.model??c.project,formatConverted(costMoney(c))])}/></Tile>
         <Tile title={t("ui.tokens.by.model.92019")} source={t("ui.all.token.types.9ba49")} className={data.energy?.month_seconds ? "full content-height" : "half content-height"}>
           {data.models.length ? (
             <List
@@ -1476,7 +1475,7 @@ function Palette({
       run: () => selectHost(h.host_id),
     })),
     ...agents.map((a) => ({
-      label: `${agentName(a.kind)} · ${a.project || a.id}`,
+      label: a.label || `${agentName(a.kind)} · ${a.project || a.id}`,
       group: t("palette.agent"),
       run: () => {
         go("agents");
@@ -1759,7 +1758,7 @@ function App() {
         <span className="terminal-window-title"><MonoMark/>{host || "fleetglass"} - fleetglass - {Math.max(40,Math.floor((typeof window !== "undefined" ? window.innerWidth : 1440)/7.5))}x{Math.max(20,Math.floor((typeof window !== "undefined" ? window.innerHeight : 900)/18))}</span>
       </div>
       <header className="top">
-        <div className="terminal-status"><MonoMark/><b>fleetglass {release?.version ?? ""}</b><span className="terminal-separator">│</span><span className="host"><TerminalFilter label={t("ui.host.3960e")} choices={hosts.map(h=>h.host_id)} value={host} onChange={setHost}/></span><span className="terminal-separator">│</span><span>{t("terminal.status_up")} {t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_kernel")} {t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_load")} {value(result(data.overview?.results||[],"load"),"1m")?.toFixed(2) ?? t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{value(result(data.overview?.results||[],"cpu"),"core_count") ?? "—"} {t("terminal.label_threads")} · {value(result(data.overview?.results||[],"memory"),"total_bytes")===null?t("terminal.not_collected"):formatBytes(value(result(data.overview?.results||[],"memory"),"total_bytes"))}</span><span className="terminal-separator">│</span><span className="terminal-warn-count">{data.overview?.results.filter(x=>x.state==="warn").length ?? 0} WARN</span><span className="terminal-crit-count">{data.overview?.results.filter(x=>x.state==="crit").length ?? 0} CRIT</span><span>{data.stream === "stale" ? t("ui.connection.lost.62583") : stale ? t("ui.stale.data.2e635") : data.stream === "connecting" ? t("ui.connecting.c1f3b") : t("ui.live.65c82")}</span><span className="terminal-time">{new Date(tick).toLocaleString(preferences.language === "fr" ? "fr-FR" : "sv-SE",{dateStyle:"short",timeStyle:"medium",hour12:false})}</span>{protectedServer?<button type="button" className="quiet" onClick={signOut}>{t("ui.sign.out.dc164")}</button>:null}</div>
+        <div className="terminal-status"><MonoMark/><b>fleetglass {release?.version ?? ""}</b><span className="terminal-separator">│</span><span className="host"><TerminalFilter label={t("ui.host.3960e")} choices={hosts.map(h=>h.host_id)} value={host} onChange={setHost}/></span><span className="terminal-separator">│</span><span>{t("terminal.status_up")} {value(result(data.overview?.results||[],"host"),"uptime_seconds")===null?t("terminal.not_collected"):(()=>{const minutes=Math.floor(value(result(data.overview?.results||[],"host"),"uptime_seconds")!/60);return `${Math.floor(minutes/1440)}d ${String(Math.floor(minutes%1440/60)).padStart(2,"0")}:${String(minutes%60).padStart(2,"0")}`})()}</span><span className="terminal-separator">│</span><span>{t("terminal.status_kernel")} {result(data.overview?.results||[],"host")?.fields?.kernel_release?`Linux ${result(data.overview?.results||[],"host")?.fields?.kernel_release} ${result(data.overview?.results||[],"host")?.fields?.arch??""}`:t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_load")} {value(result(data.overview?.results||[],"load"),"1m")?.toFixed(2) ?? t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{value(result(data.overview?.results||[],"cpu"),"core_count") ?? "—"} {t("terminal.label_threads")} · {value(result(data.overview?.results||[],"memory"),"total_bytes")===null?t("terminal.not_collected"):formatBytes(value(result(data.overview?.results||[],"memory"),"total_bytes"))}</span><span className="terminal-separator">│</span><span className="terminal-warn-count">{data.overview?.results.filter(x=>x.state==="warn").length ?? 0} WARN</span><span className="terminal-crit-count">{data.overview?.results.filter(x=>x.state==="crit").length ?? 0} CRIT</span><span>{data.stream === "stale" ? t("ui.connection.lost.62583") : stale ? t("ui.stale.data.2e635") : data.stream === "connecting" ? t("ui.connecting.c1f3b") : t("ui.live.65c82")}</span><span className="terminal-time">{new Date(tick).toLocaleString(preferences.language === "fr" ? "fr-FR" : "sv-SE",{dateStyle:"short",timeStyle:"medium",hour12:false})}</span>{protectedServer?<button type="button" className="quiet" onClick={signOut}>{t("ui.sign.out.dc164")}</button>:null}</div>
         <div className="terminal-tabs"><nav className="tabs" aria-label={t("ui.views.24be6")}>{terminalViews.filter(v=>!preferences.hiddenTabs.includes(v)).map(v=>{const index=terminalViews.indexOf(v);return <button type="button" key={v} aria-pressed={view===v||(v==="machine"&&view==="storage")} onClick={()=>go(v)}>{index===9?0:index+1} {t(navigationLabels[v as keyof typeof navigationLabels], preferences.language).toLowerCase()}</button>})}<button type="button" className="terminal-search" onClick={()=>setPalette(true)} aria-label={t("ui.search.or.jump.to.commands.control.or.command.k.26860")} title={t("ui.search.or.jump.to.commands.ctrl.k.50228")}>{t("ui.k.64d86")}</button>{hosts.length>1?<button type="button" onClick={()=>go("fleet")}>{formatNumber(fleet.filter(h=>h.liveness==="live").length)} {t("ui.of.de04f")} {formatNumber(fleet.length)} {t("ui.hosts.reporting.57618")} · {formatNumber(fleet.filter(h=>h.liveness!=="live").length)} {t("ui.need.attention.c8806")} · {t("ui.view.fleet.8d8a0")}</button>:null}<button type="button" aria-pressed={view==="settings"} onClick={()=>go("settings")}>{t("ui.settings.c7f73",preferences.language).toLowerCase()}</button><button type="button" aria-pressed={view==="glossary"} onClick={()=>go("glossary")}>{t("terminal.glossary")}</button></nav><div className="terminal-range" role="group" aria-label={t("terminal.range")}>{t("terminal.range")} {(["1h","24h","7d","30d"] as Range[]).map(v=><button key={v} type="button" aria-pressed={range===v} onClick={()=>setRange(v)}>{v}</button>)}</div><div className="terminal-theme" role="group" aria-label={t("terminal.theme")}>{(["system","light","dark"] as const).map(mode=><button type="button" key={mode} aria-pressed={themeMode===mode} onClick={()=>setTheme(mode)}>{mode === "system" ? t("terminal.system") : mode === "light" ? t("terminal.light") : t("terminal.dark")}</button>)}</div></div>
       </header>
       {auth === "offline" ? (

@@ -17,7 +17,8 @@ import visual_check as fixture
 OUT = Path(__file__).resolve().parents[2] / "assets" / "screenshots"
 fixture.HOST_ID = "demo-01"
 fixture.RESULTS = [
-    fixture.result("cpu", {"busy_percent": 18, "core_count": 8, "user_percent": 11, "system_percent": 4, "iowait_percent": 2, "steal_percent": 1, "core_0_percent": 12, "core_1_percent": 24}),
+    fixture.result("host", {"uptime_seconds": 1043400}) | {"fields": {"kernel_release":"6.12.1-demo", "arch":"amd64"}},
+    fixture.result("cpu", {"frequency_current_mhz": 2200, "frequency_max_mhz": 3600, "busy_percent": 18, "core_count": 8, "user_percent": 11, "system_percent": 4, "iowait_percent": 2, "steal_percent": 1, "core_0_percent": 12, "core_1_percent": 24}),
     fixture.result("load", {"1m": 0.82, "5m": 0.76, "15m": 0.69}),
     fixture.result("memory", {"used_bytes": 11 * 1024**3, "total_bytes": 32 * 1024**3, "swap_used_bytes": 0, "swap_total_bytes": 4 * 1024**3, "page_cache_bytes": 4 * 1024**3, "buffers_bytes": 512 * 1024**2, "pressure_some_avg10": 0.4}),
     fixture.result("disk:/", {"used_bytes": 236 * 1024**3, "total_bytes": 1000 * 1024**3, "inodes_used": 82000, "inodes_total": 1000000}),
@@ -26,6 +27,7 @@ fixture.RESULTS = [
     fixture.result("systemd:failed", {"count": 0}),
     fixture.result("systemd:api", detail="active") | {"detail_code": "active"},
     fixture.result("systemd:worker", detail="active") | {"detail_code": "active"},
+    fixture.result("dns:demo.example", {"latency_ms": 12}, detail="resolved"),
     fixture.result("network:eth0", {"rx_bytes_per_second": 28672, "tx_bytes_per_second": 12288, "rx_bytes": 8 * 1024**3, "tx_bytes": 4 * 1024**3}),
     fixture.result("port:tcp:ipv4:3100:loopback", {"port": 3100}),
     fixture.result("smart:0", {"wear_percent": 5, "media_errors": 0}, detail="disk health"),
@@ -45,7 +47,7 @@ fixture.RESULTS = [
 ]
 
 def session(number, kind, project, model, cpu, memory):
-    return {"id": f"demo-session-{number}", "kind": kind, "project": project,
+    return {"id": f"demo-session-{number}", "label": f"{kind} · {project} · demo-{number}", "api_equivalent_usd": (7.92,5.84,3.67)[number-1], "usage_measured": True, "speed_tokens_per_second": (15.2,42.5,13.8)[number-1], "speed_method":"estimated", "kind": kind, "project": project,
             "worktree": project, "user": "developer", "pid": 2400 + number,
             "cpu_percent": cpu, "rss_bytes": memory * 1024**2, "at": fixture.iso(), "started_at": fixture.iso(-5400),
             "state": "working", "reason": "", "source": "otel", "model": model}
@@ -66,6 +68,7 @@ fixture.QUOTAS = [
     {"kind": "claude", "window": "primary", "used_percent": 31,
      "resets_at": fixture.iso(2 * 3600), "observed_at": fixture.iso(), "method": "estimated"},
 ]
+fixture.MODEL_COSTS = [{"project":name,"model":name,"method":"api_equivalent","usd":amount,"partial":False,"unpriced_tokens":0} for name, amount in (("claude-sonnet-4-5",11.59),("gpt-6-sol",5.84))]
 fixture.COSTS = [{"project": name, "method": "api_equivalent", "usd": amount,
                   "partial": False, "unpriced_tokens": 0}
                  for name, amount in (("atlas", 7.92), ("orbit", 5.84), ("ledger", 3.67))]
@@ -180,6 +183,10 @@ def main():
                         raise AssertionError(f"Panel text clipped in {view}-{theme}-{width}: {overflowing}")
                 suffix = "mobile" if width == 390 else theme
                 page.screenshot(path=str(OUT / f"{view}-{suffix}.png"), full_page=True)
+                if view == "agents" and theme == "light":
+                    page.locator(".agent-table .terminal-link").first.click()
+                    page.locator("#session-detail").wait_for()
+                    page.screenshot(path=str(OUT / "agents-detail-light.png"), full_page=True)
                 page.close()
             browser.close()
     finally:

@@ -63,11 +63,19 @@ def main():
             browser=playwright.chromium.launch(headless=True)
             for theme in ("light","dark"):
                 page=browser.new_page(viewport={"width":1440,"height":900},device_scale_factor=1)
+                detail_requests=[]
+                page.on("request",lambda request: detail_requests.append(request.url) if "/agents/" in urlparse(request.url).path else None)
                 page.add_init_script("window.localStorage.setItem('fg-theme', '%s');window.EventSource=class {constructor(){setTimeout(()=>this.onopen?.(),20)} addEventListener(){} close(){}};"%theme)
                 for view in VIEWS:
                     page.goto(f"http://127.0.0.1:{server.server_port}/{'' if view=='overview' else view}",wait_until="networkidle")
                     page.locator('main').wait_for()
                     page.wait_for_timeout(100)
+                    if view=="overview":
+                        status=page.locator(".terminal-status").inner_text()
+                        content=page.locator("main").inner_text()
+                        if "12d 01:50" not in status or "Linux 6.12.1-demo amd64" not in status: errors.append(f"{theme}: host facts missing")
+                        if "2200 / 3600 MHz" not in content or "demo.example" not in content: errors.append(f"{theme}: frequency or DNS missing")
+                        if detail_requests: errors.append(f"{theme}: overview requested session details: {len(detail_requests)}")
                     errors.extend(f"{view}-{theme}: {e}" for e in inspect(page,1440))
                     page.screenshot(path=str(OUT/f"{view}-{theme}.png"),full_page=True)
                     if view=="machine":

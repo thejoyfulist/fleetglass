@@ -44,7 +44,43 @@ func readUint(path string) (uint64, error) {
 }
 
 func (m *Machine) Fast(ctx context.Context) []model.Result {
-	return []model.Result{m.CPU(), m.Load(), m.Memory()}
+	return []model.Result{m.Host(), m.CPU(), m.Load(), m.Memory()}
+}
+func (m *Machine) Host() model.Result {
+	fields := map[string]string{"arch": runtime.GOARCH}
+	values := map[string]float64{}
+	if b, err := os.ReadFile(filepath.Join(m.Proc, "uptime")); err == nil {
+		if parts := strings.Fields(string(b)); len(parts) > 0 {
+			if seconds, err := strconv.ParseFloat(parts[0], 64); err == nil && seconds >= 0 {
+				values["uptime_seconds"] = seconds
+			}
+		}
+	}
+	if b, err := os.ReadFile(filepath.Join(m.Proc, "sys/kernel/osrelease")); err == nil {
+		fields["kernel_release"] = strings.TrimSpace(string(b))
+	}
+	if len(values) == 0 && fields["kernel_release"] == "" {
+		return result("host", model.Unknown, "host facts unavailable", nil)
+	}
+	return model.Result{Name: "host", State: model.OK, Detail: "host facts", Values: values, Fields: fields}
+}
+func (m *Machine) Frequency() map[string]float64 {
+	dirs, _ := filepath.Glob(filepath.Join(m.Sys, "devices/system/cpu/cpu[0-9]*/cpufreq"))
+	out := map[string]float64{}
+	for _, metric := range []struct{ file, key string }{{"scaling_cur_freq", "frequency_current_mhz"}, {"cpuinfo_max_freq", "frequency_max_mhz"}} {
+		var sum float64
+		var count int
+		for _, dir := range dirs {
+			if value, err := readUint(filepath.Join(dir, metric.file)); err == nil && value > 0 {
+				sum += float64(value) / 1000
+				count++
+			}
+		}
+		if count > 0 {
+			out[metric.key] = sum / float64(count)
+		}
+	}
+	return out
 }
 func (m *Machine) CPU() model.Result {
 	f, e := os.Open(filepath.Join(m.Proc, "stat"))
@@ -100,7 +136,7 @@ func (m *Machine) CPU() model.Result {
 	prevTotal, prevIdle := m.cpuTotal, m.cpuIdle
 	m.cpuTotal, m.cpuIdle = total, idle
 	if prevTotal == 0 || total <= prevTotal || idle < prevIdle {
-		return result("cpu", model.Unknown, "waiting for CPU delta", nil)
+		return result("cpu", model.Unknown, "waiting for CPU delta", m.Frequency())
 	}
 	pct := 100 * float64(total-prevTotal-(idle-prevIdle)) / float64(total-prevTotal)
 	state := model.OK
@@ -115,6 +151,9 @@ func (m *Machine) CPU() model.Result {
 		cores = runtime.NumCPU()
 	}
 	v := map[string]float64{"busy_percent": pct, "core_count": float64(cores)}
+	for key, frequency := range m.Frequency() {
+		v[key] = frequency
+	}
 	if old := previousFields["cpu"]; len(old) >= 8 && len(all) >= 8 {
 		for _, metric := range []struct {
 			key     string

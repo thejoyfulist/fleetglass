@@ -3,12 +3,35 @@ package probe
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/thejoyfulist/fleetglass/internal/model"
 )
+
+func TestHostFactsAndFrequencyFixtures(t *testing.T) {
+	proc, sys := filepath.Join(t.TempDir(), "proc"), filepath.Join(t.TempDir(), "sys")
+	fixture(t, proc, "uptime", "1043400.25 1000.00\n")
+	fixture(t, proc, "sys/kernel/osrelease", "6.12.1-demo\n")
+	fixture(t, proc, "stat", "cpu 10 0 10 80 0 0 0 0\n")
+	fixture(t, sys, "devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "1800000\n")
+	fixture(t, sys, "devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq", "3000000\n")
+	fixture(t, sys, "devices/system/cpu/cpu1/cpufreq/scaling_cur_freq", "2200000\n")
+	fixture(t, sys, "devices/system/cpu/cpu1/cpufreq/cpuinfo_max_freq", "4000000\n")
+	m := NewMachine(proc, sys)
+	host := m.Host()
+	if host.Values["uptime_seconds"] != 1043400.25 || host.Fields["kernel_release"] != "6.12.1-demo" || host.Fields["arch"] != runtime.GOARCH {
+		t.Fatalf("host: %+v", host)
+	}
+	if cpu := m.CPU(); cpu.Values["frequency_current_mhz"] != 2000 || cpu.Values["frequency_max_mhz"] != 3500 {
+		t.Fatalf("frequency: %+v", cpu)
+	}
+	if frequency := NewMachine(t.TempDir(), t.TempDir()).Frequency(); len(frequency) != 0 {
+		t.Fatalf("missing sysfs should be unknown: %+v", frequency)
+	}
+}
 
 func fixture(t *testing.T, root, name, data string) {
 	t.Helper()

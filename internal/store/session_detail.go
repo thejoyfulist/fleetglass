@@ -32,6 +32,7 @@ func (s *Store) SessionDetail(host, id string, overrides map[string]model.AIPric
 	if err := json.Unmarshal([]byte(raw), &out.Session); err != nil {
 		return out, err
 	}
+	out.Session.Label = SessionLabel(out.Session)
 	rows, err := s.DB.Query(`SELECT data FROM ai_usage WHERE host_id=? AND session_id=?`, host, id)
 	if err != nil {
 		return out, err

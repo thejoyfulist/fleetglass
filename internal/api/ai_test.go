@@ -33,7 +33,7 @@ func TestAIEndpointsAndSSEOverview(t *testing.T) {
 	if w.Code != 204 {
 		t.Fatalf("ingest %d: %s", w.Code, w.Body.String())
 	}
-	for path, match := range map[string]string{"/api/v1/hosts/host/agents": "demo", "/api/v1/hosts/host/ai/usage?range=24h&by=project": "input", "/api/v1/hosts/host/ai/quotas": "primary", "/api/v1/hosts/host/ai/costs?range=24h": "api_equivalent", "/api/v1/hosts/host/overview": "agents"} {
+	for path, match := range map[string]string{"/api/v1/hosts/host/agents": "api_equivalent_usd", "/api/v1/hosts/host/ai/usage?range=24h&by=project": "input", "/api/v1/hosts/host/ai/quotas": "primary", "/api/v1/hosts/host/ai/costs?range=24h": "api_equivalent", "/api/v1/hosts/host/ai/costs?range=24h&by=model": "claude-sonnet-5", "/api/v1/hosts/host/overview": "agents"} {
 		w = httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
 		if w.Code != 200 || !strings.Contains(w.Body.String(), match) {

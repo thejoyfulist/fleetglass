@@ -26,7 +26,8 @@ def result(name, values=None, state="ok", detail="Observed"):
     if detail == "Observed": row["detail_code"] = "observed"
     return row
 RESULTS = [
-    result("cpu", {"busy_percent": 5.0, "core_count": 4}),
+    result("host", {"uptime_seconds": 1043400}) | {"fields": {"kernel_release": "6.12.1-demo", "arch": "amd64"}},
+    result("cpu", {"busy_percent": 5.0, "core_count": 4, "frequency_current_mhz": 2200, "frequency_max_mhz": 3600}),
     result("memory", {"used_bytes": 47 * 1024**3, "total_bytes": 64 * 1024**3, "swap_used_bytes": 2 * 1024**3, "swap_total_bytes": 8 * 1024**3}),
     result("disk:/", {"used_bytes": 470 * 1024**3, "total_bytes": 1000 * 1024**3, "inodes_used": 120000, "inodes_total": 1000000}),
     result("cpu_package_power", {"watts": 6.0}),
@@ -35,6 +36,7 @@ RESULTS = [
     result("systemd:caddy", detail="active") | {"detail_code":"active"},
     result("systemd:tailscaled", detail="active") | {"detail_code":"active"},
     result("systemd:sample_service", detail="active") | {"detail_code":"active"},
+    result("dns:demo.example", {"latency_ms": 12}, detail="resolved"),
     result("network:eth0", {"rx_bytes_per_second": 2048, "tx_bytes_per_second": 512, "rx_bytes": 5 * 1024**3, "tx_bytes": 2 * 1024**3}),
     result("container:local:web", detail="healthy") | {"detail_code":"healthy"},
     result("tls:example.test", {"days_remaining":21}, state="warn", detail="Expires in 21 days") | {"detail_code":"certificate_expires"},
@@ -57,8 +59,8 @@ RESULTS = [
     {**result("repository:0:fleetglass", {"dirty":1,"ahead":2,"behind":0,"last_commit_age_seconds":3600,"has_upstream":1}, state="warn"), "fields":{"repository":"fleetglass"}},
 ]
 AGENTS = [
-    {"id":"session-1", "kind":"claude", "project":"dashboard", "worktree":"dashboard", "user":"agent", "pid":2345, "cpu_percent":5.0, "rss_bytes":512*1024**2, "at":iso(), "state":"working", "reason":"", "source":"otel", "model":"Claude Sonnet"},
-    {"id":"session-2", "kind":"codex", "project":"fleetglass", "worktree":"fleetglass-m3", "user":"agent", "pid":2456, "cpu_percent":2.5, "rss_bytes":384*1024**2, "at":iso(), "state":"waiting-for-input", "reason":"Awaiting approval", "source":"local log", "model":"Codex"},
+    {"id":"session-1", "label":"claude · atlas · session-1", "api_equivalent_usd":8.47, "usage_measured":True, "speed_tokens_per_second":12.5, "speed_method":"estimated", "kind":"claude", "project":"dashboard", "worktree":"dashboard", "user":"agent", "pid":2345, "cpu_percent":5.0, "rss_bytes":512*1024**2, "at":iso(), "state":"working", "reason":"", "source":"otel", "model":"Claude Sonnet"},
+    {"id":"session-2", "label":"codex · orbit · session-2", "api_equivalent_usd":4.21, "usage_measured":True, "speed_tokens_per_second":42.5, "speed_method":"estimated", "kind":"codex", "project":"fleetglass", "worktree":"fleetglass-m3", "user":"agent", "pid":2456, "cpu_percent":2.5, "rss_bytes":384*1024**2, "at":iso(), "state":"waiting-for-input", "reason":"Awaiting approval", "source":"local log", "model":"Codex"},
 ]
 def tokens(n):
     return {"input":n, "output":0, "cache_write":0, "cache_read":0}
@@ -70,6 +72,7 @@ QUOTAS = [
     {"kind":"codex","window":"secondary","used_percent":41.6,"resets_at":iso(4*86400),"observed_at":iso(),"method":"cli_reported"},
     {"kind":"codex","window":"primary","used_percent":18.1,"resets_at":iso(3*3600),"observed_at":iso(),"method":"cli_reported"},
 ]
+MODEL_COSTS = [{"project":"Claude Sonnet","model":"Claude Sonnet","method":"api_equivalent","usd":8.47,"partial":False,"unpriced_tokens":0}]
 COSTS = [
     {"project":"dashboard", "method":"api_equivalent", "usd":8.47,"partial":True,"unpriced_tokens":970000},
     {"project":"fleetglass", "method":"api_equivalent", "usd":4.21,"partial":False,"unpriced_tokens":0},
@@ -116,7 +119,7 @@ class Handler(SimpleHTTPRequestHandler):
             elif path.endswith("/agents"): data = AGENTS
             elif path.endswith("/apps"): data = {"apps":APPS,"history":[],"top_hours":[],"range":"24h"}
             elif path.endswith("/ai/quotas"): data = QUOTAS
-            elif path.endswith("/ai/costs"): data = COSTS
+            elif path.endswith("/ai/costs"): data = MODEL_COSTS if q.get("by") == ["model"] else COSTS
             elif path.endswith("/ai/speed"): data = SPEED
             elif path.endswith("/ai/subscriptions"): data = SUBSCRIPTIONS
             elif path.endswith("/worktrees"): data = WORKTREES

@@ -38,6 +38,7 @@ type Config struct {
 	SystemdUnits       []string          `json:"systemd_units"`
 	DockerSockets      []string          `json:"docker_sockets"`
 	TLSDomains         []string          `json:"tls_domains"`
+	DNSProbeNames      []string          `json:"dns_probe_names"`
 	SMARTDevices       []string          `json:"smart_devices"`
 	HelperSocket       string            `json:"helper_socket"`
 	DBPath             string            `json:"db_path"`
@@ -136,6 +137,16 @@ type HTTPProbe struct {
 	IntervalSeconds int    `json:"interval_seconds"`
 	FollowRedirects bool   `json:"follow_redirects"`
 	Public          bool   `json:"public"`
+}
+
+func validDNSName(name string) bool {
+	label := regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$`)
+	for _, part := range strings.Split(strings.TrimSuffix(name, "."), ".") {
+		if !label.MatchString(part) {
+			return false
+		}
+	}
+	return name != ""
 }
 
 func Load(path string) (Config, error) {
@@ -268,6 +279,11 @@ func Load(path string) (Config, error) {
 		}
 	}
 	identifier := regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$`)
+	for _, name := range c.DNSProbeNames {
+		if len(name) > 253 || net.ParseIP(name) != nil || strings.ContainsAny(name, "/:@ ") || !validDNSName(name) {
+			return c, fmt.Errorf("invalid dns_probe_names entry")
+		}
+	}
 	seen := map[string]bool{}
 	checkName := func(kind, name string) error {
 		if !identifier.MatchString(name) || seen[kind+":"+name] {

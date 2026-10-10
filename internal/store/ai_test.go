@@ -42,6 +42,48 @@ func TestAIDedupAndRetention(t *testing.T) {
 	}
 }
 
+func TestCostsByModelAndSessionSummary(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "costs.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	id := strings.Repeat("a", 64)
+	usage := []model.AIUsage{
+		{ID: strings.Repeat("b", 64), Session: id, Kind: "codex", Model: "priced-a", Project: "atlas", At: now, Source: "otlp", Tokens: model.Tokens{Input: 1000000}, OutputTokensPerSecond: 12, SpeedMethod: "otlp"},
+		{ID: strings.Repeat("c", 64), Session: id, Kind: "codex", Model: "priced-b", Project: "atlas", At: now, Source: "otlp", Tokens: model.Tokens{Input: 2000000}},
+		{ID: strings.Repeat("d", 64), Session: id, Kind: "codex", Model: "unpriced", Project: "atlas", At: now, Source: "otlp", Tokens: model.Tokens{Input: 100}},
+	}
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{{ID: id, Kind: "codex", Project: "atlas", Worktree: "/tmp/atlas", At: now, Source: "otlp"}}, Usage: usage}}); err != nil {
+		t.Fatal(err)
+	}
+	prices := map[string]model.AIPrice{"priced-a": {Input: 2}, "priced-b": {Input: 3}}
+	rows, err := s.CostsBy("host", "24h", "model", prices, nil)
+	if err != nil || len(rows) != 3 {
+		t.Fatalf("model costs: %+v %v", rows, err)
+	}
+	amounts := map[string]float64{}
+	for _, row := range rows {
+		if row["method"] == "api_equivalent" {
+			amounts[row["model"].(string)] = row["usd"].(float64)
+		}
+	}
+	if amounts["priced-a"] != 2 || amounts["priced-b"] != 6 || amounts["unpriced"] != 0 {
+		t.Fatalf("amounts: %+v", amounts)
+	}
+	sessions, err := s.AgentsWithSummary("host", prices)
+	if err != nil || len(sessions) != 1 || sessions[0].APIEquivalentUSD != 8 || !sessions[0].UsageMeasured || sessions[0].SpeedTokensPerSecond == nil || *sessions[0].SpeedTokensPerSecond != 12 || sessions[0].Label != "codex · atlas · aaaaaaaa" {
+		t.Fatalf("sessions: %+v %v", sessions, err)
+	}
+	if _, err := s.CostsBy("host", "24h", "invalid", prices, nil); err == nil {
+		t.Fatal("invalid grouping accepted")
+	}
+	if label := SessionLabel(model.AgentSession{ID: id, Kind: "codex", Project: "atlas", Worktree: "/tmp/orbit", Branch: "feature/preview"}); label != "codex · orbit · feature/preview · aaaaaaaa" {
+		t.Fatalf("metadata label: %s", label)
+	}
+}
+
 func TestProcessSessionSnapshot(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "process.db"))
 	if err != nil {

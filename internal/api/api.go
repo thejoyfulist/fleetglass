@@ -168,12 +168,20 @@ func (a *API) Handler() http.Handler {
 		writeJSON(w, points)
 	})
 	mux.HandleFunc("GET /api/v1/hosts/{id}/agents", func(w http.ResponseWriter, r *http.Request) {
-		v, e := a.Store.Agents(r.PathValue("id"))
+		v, e := a.Store.AgentsWithSummary(r.PathValue("id"), a.AIPrices)
 		if e != nil {
 			http.Error(w, "storage error", 500)
 			return
 		}
-		writeJSON(w, v)
+		type listedSession struct {
+			model.AgentSession
+			APIMoney money.Amount `json:"api_money"`
+		}
+		out := make([]listedSession, 0, len(v))
+		for _, session := range v {
+			out = append(out, listedSession{session, a.convert(r, session.APIEquivalentUSD, "USD")})
+		}
+		writeJSON(w, out)
 	})
 	mux.HandleFunc("GET /api/v1/hosts/{id}/agents/{session}", func(w http.ResponseWriter, r *http.Request) {
 		v, e := a.Store.SessionDetail(r.PathValue("id"), r.PathValue("session"), a.AIPrices)
@@ -219,7 +227,11 @@ func (a *API) Handler() http.Handler {
 		writeJSON(w, v)
 	})
 	mux.HandleFunc("GET /api/v1/hosts/{id}/ai/costs", func(w http.ResponseWriter, r *http.Request) {
-		v, e := a.Store.Costs(r.PathValue("id"), r.URL.Query().Get("range"), a.AIPrices, a.AISubscriptions)
+		by := r.URL.Query().Get("by")
+		if by == "" {
+			by = "project"
+		}
+		v, e := a.Store.CostsBy(r.PathValue("id"), r.URL.Query().Get("range"), by, a.AIPrices, a.AISubscriptions)
 		if e != nil {
 			http.Error(w, "invalid range", 400)
 			return

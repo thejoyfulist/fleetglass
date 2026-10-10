@@ -21,7 +21,7 @@ func TestMCPProtocolReadOnlyAndToken(t *testing.T) {
 	}
 	defer s.Close()
 	now := time.Now().UTC()
-	if err := s.Ingest(model.Batch{HostID: "host", At: now, Results: []model.Result{{Name: "cpu", State: model.OK, Values: map[string]float64{"busy_percent": 20, "core_count": 2}}}}); err != nil {
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, Results: []model.Result{{Name: "cpu", State: model.OK, Values: map[string]float64{"busy_percent": 20, "core_count": 2}}, {Name: "host", State: model.OK, Values: map[string]float64{"uptime_seconds": 3600}, Fields: map[string]string{"kernel_release": "6.12-demo", "arch": "amd64"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	h := New(s, "ingest", "").MCPHandler(strings.Repeat("t", 40))
@@ -69,7 +69,7 @@ func TestMCPProtocolReadOnlyAndToken(t *testing.T) {
 		}
 	}
 	got = request(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"host_status","arguments":{"host":"host"}}}`, strings.Repeat("t", 40))
-	if got.Code != 200 || !strings.Contains(got.Body.String(), `host`) {
+	if got.Code != 200 || !strings.Contains(got.Body.String(), `uptime_seconds`) || !strings.Contains(got.Body.String(), `6.12-demo`) {
 		t.Fatalf("status: %d %s", got.Code, got.Body.String())
 	}
 	got = request(`{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"kill_process","arguments":{"host":"host"}}}`, strings.Repeat("t", 40))

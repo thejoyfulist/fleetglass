@@ -2,6 +2,8 @@
 
 **See which AI agent is using your server, what it costs, and what changed around it.** Fleetglass is a self-hosted, read-only cockpit for Linux servers running Claude Code and Codex. It connects agent sessions and projects to processes, CPU, memory, token usage and quotas alongside machine and service monitoring. Your data stays on your own server.
 
+The cockpit uses a monochrome macOS Terminal palette, text tables, block bars, cyan warnings and magenta critical states. Keyboard shortcuts switch views (`1`–`9`), cycle the range (`r`), search (`/`), and switch theme (`t`). English is the first-visit default; French is available in Settings.
+
 ![Light-theme Overview showing three active AI agents, healthy services and one certificate to watch](assets/screenshots/overview-light.png)
 
 *All screenshots below use synthetic data from the `demo-01` fixture. No real host or account data is shown.*
@@ -17,13 +19,15 @@
 
 ## One cockpit for the machine and its agents
 
-- **AI sessions in context:** live Claude Code and Codex sessions, process trees, worktrees, token pace, quota forecasts, request speed and cost by project. OTLP is the primary feed; opt-in local logs are a fallback.
+- **AI sessions in context:** live Claude Code and Codex sessions, readable metadata-only names, process trees, worktrees, token pace, quota forecasts, request speed and cost by project or model. OTLP is the primary feed; opt-in local logs are a fallback.
 - **A name behind each number:** app groups by unit, container and agent session; CPU, memory, disk and measured container network; project dev servers, storage map and fixed-rule insights.
 - **Server health:** CPU, memory, disks, SMART, RAPL energy, network, GPU when present, Docker, systemd, listening ports, TLS, updates, journal errors, backups and changes.
 - **Availability across a fleet:** external and internal probes, 30-day history, a minimal public status page and per-host tokens for remote agents.
 - **A private, installable cockpit:** live SSE updates, English and French, light and dark themes, phone layout, offline shell, read-only Prometheus export and an optional read-only MCP endpoint. No action can restart or change your host.
 
 ![Agents view showing three synthetic Claude Code and Codex sessions](assets/screenshots/agents-light.png)
+
+![Session detail for a synthetic agent](assets/screenshots/agents-detail-light.png)
 
 ![Apps view grouping synthetic containers and agent sessions by resource use](assets/screenshots/apps-light.png)
 

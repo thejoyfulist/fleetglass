@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Milestone 11: host uptime and kernel facts, CPU frequency, optional DNS resolution probe, cost by model, readable session labels, and session summaries in the agent list to reduce live requests.
+- Milestone 10: terminal-style cockpit in light and dark themes, text tables and block bars, cyan warnings, magenta critical states, keyboard shortcuts, and English-first localization.
+
 - Milestone 1: unprivileged machine and service agent, SQLite server, embedded cockpit.
 - Milestone 2: Claude Code and Codex OTLP ingestion, session correlation, quotas and cost estimates.
 - Milestone 3: live bilingual cockpit, accessible light and dark themes.

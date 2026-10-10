@@ -1,6 +1,6 @@
 # Read-only MCP endpoint
 
-Fleetglass's MCP endpoint is **off by default**. It uses a separate Streamable HTTP listener, bound to a loopback IP, and requires its own bearer token. It exposes four read-only tools: `what_is_running`, `figure_attribution`, `what_is_on_port`, and `host_status`. There are no action tools. The result reflects observations, not a complete process or port inventory; configured project roots determine which processes have port attribution.
+Fleetglass's MCP endpoint is **off by default**. It uses a separate Streamable HTTP listener, bound to a loopback IP, and requires its own bearer token. It exposes four read-only tools: `what_is_running`, `figure_attribution`, `what_is_on_port`, and `host_status`. There are no action tools. The result reflects observations, not a complete process or port inventory; configured project roots determine which processes have port attribution. `host_status` includes observed uptime seconds, kernel release, and architecture when available.
 
 ## Enable locally
 

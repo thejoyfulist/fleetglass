@@ -178,28 +178,34 @@ func (s AISubscription) Amount() (float64, string) {
 }
 
 type AgentSession struct {
-	ID                string    `json:"id"`
-	Kind              string    `json:"kind"`
-	Model             string    `json:"model,omitempty"`
-	Project           string    `json:"project,omitempty"`
-	Worktree          string    `json:"worktree,omitempty"`
-	User              string    `json:"user,omitempty"`
-	PID               int       `json:"pid,omitempty"`
-	CPU               float64   `json:"cpu_percent,omitempty"`
-	RSS               int64     `json:"rss_bytes,omitempty"`
-	At                time.Time `json:"at"`
-	StartedAt         time.Time `json:"started_at,omitempty"`
-	EndedAt           time.Time `json:"ended_at,omitempty"`
-	CPUSeconds        float64   `json:"cpu_seconds,omitempty"`
-	PeakRSSBytes      int64     `json:"peak_rss_bytes,omitempty"`
-	State             string    `json:"state"`
-	Reason            string    `json:"reason"`
-	ReasonCode        string    `json:"reason_code,omitempty"`
-	Source            string    `json:"source"`
-	LastTurnEnded     bool      `json:"last_turn_ended,omitempty"`
-	LastStatus        string    `json:"last_status,omitempty"`
-	LastTool          string    `json:"last_tool,omitempty"`
-	RequestDurationMS float64   `json:"request_duration_ms,omitempty"`
+	ID                   string    `json:"id"`
+	Label                string    `json:"label,omitempty"`
+	Branch               string    `json:"branch,omitempty"`
+	APIEquivalentUSD     float64   `json:"api_equivalent_usd,omitempty"`
+	UsageMeasured        bool      `json:"usage_measured,omitempty"`
+	SpeedTokensPerSecond *float64  `json:"speed_tokens_per_second,omitempty"`
+	SpeedMethod          string    `json:"speed_method,omitempty"`
+	Kind                 string    `json:"kind"`
+	Model                string    `json:"model,omitempty"`
+	Project              string    `json:"project,omitempty"`
+	Worktree             string    `json:"worktree,omitempty"`
+	User                 string    `json:"user,omitempty"`
+	PID                  int       `json:"pid,omitempty"`
+	CPU                  float64   `json:"cpu_percent,omitempty"`
+	RSS                  int64     `json:"rss_bytes,omitempty"`
+	At                   time.Time `json:"at"`
+	StartedAt            time.Time `json:"started_at,omitempty"`
+	EndedAt              time.Time `json:"ended_at,omitempty"`
+	CPUSeconds           float64   `json:"cpu_seconds,omitempty"`
+	PeakRSSBytes         int64     `json:"peak_rss_bytes,omitempty"`
+	State                string    `json:"state"`
+	Reason               string    `json:"reason"`
+	ReasonCode           string    `json:"reason_code,omitempty"`
+	Source               string    `json:"source"`
+	LastTurnEnded        bool      `json:"last_turn_ended,omitempty"`
+	LastStatus           string    `json:"last_status,omitempty"`
+	LastTool             string    `json:"last_tool,omitempty"`
+	RequestDurationMS    float64   `json:"request_duration_ms,omitempty"`
 }
 
 type AIUsage struct {

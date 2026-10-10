@@ -37,11 +37,13 @@ project) together.
 - Read-only: Fleetglass observes; it never restarts, deploys or changes anything on the host.
 - Honest numbers: every figure says what it measures (e.g. "CPU package power", not "wall power"); unknown is shown as
   unknown, never as healthy.
-- Design (current direction): professional SaaS look, bento
-  grid in strict rows (every tile aligned, no holes), frosted-glass tiles over a restrained slate background, one
-  brand gradient (blue `#2F5BEA` to teal `#13A5B8`), Geist and Geist Mono. Light and dark themes, chosen by the user
-  (first visit follows the system). Reference: `docs/design/cockpit-reference.html`; brand: `assets/brand/BRAND.md`
-  (mark "Glass panes"). Semantic colour (amber, red) only on what deviates from normal; no emojis.
+- Design: a terminal-style cockpit with a monochrome macOS Terminal palette in light and dark themes. Content uses
+  neutral text and surfaces; cyan marks warnings and magenta marks critical states. Red, yellow, and green do not
+  appear in content. Use text tables, block bars, and square boxes whose titles interrupt the top border. Avoid
+  gradients, shadows, rounded cards, and decorative charts. Keyboard shortcuts cover views, range, theme, and search.
+  The light palette uses `--ground: #E6E6E6`, `--solid: #FFFFFF`, `--ink: #000000`, `--warn: #00A6B2`, and
+  `--crit: #B200B2`; dark uses `#000000`, `#1E1E1E`, `#E5E5E5`, `#00A6B2`, and `#E500E5` respectively.
+  English is the first-visit default; French is available in Settings. No emojis.
 - No LLM in the monitoring path. Insights ("What stands out") come from fixed, documented rules.
 
 ## v1 coverage
@@ -84,7 +86,7 @@ Raw samples 7 days, hourly aggregates 90 days, daily aggregates 2 years, inciden
 ## Milestones (reordered 2026-10-08 after `docs/COMPETITION.md`: the differentiator comes first)
 1. Agent + server + storage for machine and services, single server.
 2. AI agents: OTLP receiver + log fallback, sessions tied to processes, tokens, quotas with pace, agent health, costs.
-3. Cockpit dashboard (`docs/design/cockpit-reference.html` made real and live), light and dark themes, agents from day one.
+3. Live terminal cockpit in light and dark themes, with agents from day one.
 4. Alerts and incidents (with ack, snooze, maintenance windows, heartbeat checks, self-monitoring).
 5. Multi-server and fleet view.
 6. External probes and minimal public status page.
