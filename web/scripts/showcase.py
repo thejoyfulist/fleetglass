@@ -172,6 +172,8 @@ def main():
                 page.goto(base + ("/" if view == "overview" else f"/{view}"), wait_until="networkidle")
                 page.locator("main").wait_for()
                 page.wait_for_timeout(250)
+                # Full-page captures stitch the viewport, so pinned bars would land mid-image.
+                page.add_style_tag(content=".terminal-footer,.terminal-header,.terminal-tabs{position:static!important}")
                 body = page.locator("body").inner_text()
                 if re.search(r"\b(?:internal|oom):[a-z0-9_]+\b", body):
                     raise AssertionError(f"Technical identifier visible in {view}-{theme}-{width}")
