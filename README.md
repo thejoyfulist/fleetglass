@@ -19,6 +19,7 @@
 ## Why Fleetglass
 
 - See which agent session and project is using CPU and memory, alongside token pace, model cost estimates, and subscription quotas.
+- Know where every number comes from: each session metric is tagged OpenTelemetry, local logs, process or estimated.
 - Check machine health, services, containers, projects, probes, and recent changes on one screen.
 - Keep observations private: loopback listeners by default, local storage, and read-only host access.
 
