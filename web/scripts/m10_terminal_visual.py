@@ -14,12 +14,17 @@ import visual_check as fixture
 
 RATE = {"original": 24.05, "currency": "USD", "converted": 20.83,
         "display_currency": "EUR", "rate_source": "ecb", "rate_date": "2026-10-09"}
+fixture.AGENTS[:] = fixture.AGENTS[:3]
 fixture.AGENTS[0]["api_money"] = RATE
 fixture.AGENTS[0]["project"] = "unmatched"
 fixture.AGENTS[0]["worktree"] = "coordination"
 fixture.AGENTS[0]["label"] = "claude · unmatched · demo-1"
 fixture.AGENTS[2].update({"id": "0b82eee0abcd", "kind": "claude", "project": "unmatched",
                           "worktree": "", "label": "claude · session · 0b82eee0", "model": "claude-opus-4-1"})
+fixture.AGENTS[0].update({"source":"otlp", "sources":["otlp","process"], "provenance":{"state":"otlp","tokens":"otlp","speed":"estimated","cost":"estimated","resources":"process","model":"otlp","project":"process"}})
+fixture.AGENTS[1].update({"source":"log", "sources":["log","process"], "provenance":{"state":"log","tokens":"log","speed":"estimated","cost":"estimated","resources":"process","model":"log","project":"process"}})
+fixture.AGENTS[2].update({"source":"otlp", "sources":["otlp","log","process"], "provenance":{"state":"log","tokens":"otlp","speed":"otlp","cost":"estimated","resources":"process","model":"log","project":"log"}})
+fixture.AGENTS.append({"id":"process-only-demo", "kind":"codex", "project":"demo", "worktree":"", "at":fixture.iso(), "state":"running", "reason":"process alive", "source":"process", "sources":["process"], "provenance":{"state":"process","resources":"process","project":"process"}, "pid":2999, "model":""})
 fixture.QUOTAS[:] = [{"kind": "codex", "window": "primary", "window_minutes": 10080,
                       "used_percent": 42, "resets_at": fixture.iso(4 * 86400),
                       "observed_at": fixture.iso(), "method": "cli_reported"}]
@@ -157,6 +162,10 @@ def main():
                         if 'ECB rate' in page.locator('table').all_inner_texts().__str__(): errors.append(f"{theme}: rate repeated in table cells")
                         if 'unmatched' in page.get_by_role('region',name='AI agents').inner_text(): errors.append(f"{theme}: unmatched session label")
                         agents_text=page.get_by_role('region',name='AI agents').inner_text()
+                        agents_panel=page.get_by_role('region',name='AI agents')
+                        if not agents_panel.get_by_role('columnheader',name='src').is_visible(): errors.append(f"{theme}: source column missing")
+                        if not all(tag in agents_text for tag in ('otel+log','otel','log','proc')): errors.append(f"{theme}: source cases missing")
+                        if 'otel = OpenTelemetry · log = local logs · ~ = estimated' not in agents_text: errors.append(f"{theme}: source legend missing")
                         if 'session · 0b82' in agents_text or '0b82eee0' not in agents_text: errors.append(f"{theme}: unknown-location session ID clipped")
                         network_text=page.get_by_role('region',name='Network').inner_text()
                         if 'containers (' not in network_text or 'more' not in network_text: errors.append(f"{theme}: network grouping or overflow link missing")

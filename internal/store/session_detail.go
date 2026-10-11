@@ -5,19 +5,23 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/thejoyfulist/fleetglass/internal/ai"
 	"github.com/thejoyfulist/fleetglass/internal/model"
 )
 
 type SessionDetail struct {
-	Session          model.AgentSession     `json:"session"`
-	Tokens           model.Tokens           `json:"tokens"`
-	UsageMeasured    bool                   `json:"usage_measured"`
-	TokensPerMinute  float64                `json:"tokens_per_minute"`
-	APIEquivalentUSD float64                `json:"api_equivalent_usd"`
-	CLIReportedUSD   float64                `json:"cli_reported_usd"`
-	UnpricedTokens   int64                  `json:"unpriced_tokens"`
-	Processes        []model.ProjectProcess `json:"processes"`
-	Speed            []SpeedSummary         `json:"speed"`
+	Session          model.AgentSession      `json:"session"`
+	Tokens           model.Tokens            `json:"tokens"`
+	TokensBySource   map[string]model.Tokens `json:"tokens_by_source"`
+	Sources          []string                `json:"sources"`
+	Provenance       model.AgentProvenance   `json:"provenance"`
+	UsageMeasured    bool                    `json:"usage_measured"`
+	TokensPerMinute  float64                 `json:"tokens_per_minute"`
+	APIEquivalentUSD float64                 `json:"api_equivalent_usd"`
+	CLIReportedUSD   float64                 `json:"cli_reported_usd"`
+	UnpricedTokens   int64                   `json:"unpriced_tokens"`
+	Processes        []model.ProjectProcess  `json:"processes"`
+	Speed            []SpeedSummary          `json:"speed"`
 }
 
 func (s *Store) SessionDetail(host, id string, overrides map[string]model.AIPrice) (SessionDetail, error) {
@@ -45,8 +49,10 @@ func (s *Store) SessionDetail(host, id string, overrides map[string]model.AIPric
 			}
 		}
 	}
+	ai.NormalizeProvenance(&out.Session)
 	out.Session.Label = SessionLabel(out.Session)
-	rows, err := s.DB.Query(`SELECT data FROM ai_usage WHERE host_id=? AND session_id=?`, host, id)
+	out.TokensBySource = map[string]model.Tokens{}
+	rows, err := s.DB.Query(`SELECT u.data FROM ai_usage u WHERE u.host_id=? AND u.session_id=?`, host, id)
 	if err != nil {
 		return out, err
 	}
@@ -60,7 +66,23 @@ func (s *Store) SessionDetail(host, id string, overrides map[string]model.AIPric
 		if json.Unmarshal([]byte(data), &usage) != nil {
 			continue
 		}
+		out.TokensBySource[usage.Source] = addTokens(out.TokensBySource[usage.Source], usage.Tokens)
+		if !containsSessionSource(out.Session.Sources, usage.Source) {
+			out.Session.Sources = append(out.Session.Sources, usage.Source)
+		}
+		if usage.Source == "log" {
+			if _, measured := out.TokensBySource["otlp"]; measured {
+				continue
+			}
+		} else if usage.Source == "otlp" && out.Session.Provenance.Tokens == "log" {
+			out.Tokens = model.Tokens{}
+			out.APIEquivalentUSD = 0
+			out.CLIReportedUSD = 0
+			out.UnpricedTokens = 0
+		}
 		out.Tokens = addTokens(out.Tokens, usage.Tokens)
+		out.Session.Provenance.Tokens = usage.Source
+		out.Session.Provenance.Cost = "estimated"
 		if usage.Tokens.Input+usage.Tokens.Output+usage.Tokens.CacheWrite+usage.Tokens.CacheRead > 0 {
 			out.UsageMeasured = true
 		}
@@ -110,5 +132,21 @@ func (s *Store) SessionDetail(host, id string, overrides map[string]model.AIPric
 		out.Processes = []model.ProjectProcess{}
 	}
 	out.Speed, err = s.Speed(host, "1h", id)
+	if err == nil {
+		for _, speed := range out.Speed {
+			if speed.LiveTokensPerSecond != nil {
+				if speed.Method == "estimated" {
+					out.Session.Provenance.Speed = "estimated"
+					out.Session.Provenance.SpeedFeed = out.Session.Provenance.Tokens
+				} else {
+					out.Session.Provenance.Speed = "otlp"
+					out.Session.Provenance.SpeedFeed = "otlp"
+				}
+				break
+			}
+		}
+	}
+	out.Sources = out.Session.Sources
+	out.Provenance = out.Session.Provenance
 	return out, err
 }

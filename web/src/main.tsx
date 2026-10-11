@@ -6,7 +6,9 @@ import {
   changeDetail,
   resultDetail,
   agentName,
-  agentSource,
+  provenanceFeed,
+  sessionSourceTag,
+  sessionSourceLegend,
   agentState,
   cockpitNetwork,
   cockpitServices,
@@ -524,7 +526,9 @@ function AgentTable({
     <>
 
       {!compact && detail?<section className="g t session-detail" id="session-detail"><div className="h"><h2>{t("session.title",{agent:agentName(detail.session.kind)})}</h2><span className="src">{detail.session.model||t("value.unknown_model")}</span></div>
-        <TerminalKV rows={[[t("session.start"),hasDate(detail.session.started_at)?formatDateTime(detail.session.started_at):t("value.unknown")],[t("session.end"),hasDate(detail.session.ended_at)?formatDateTime(detail.session.ended_at):t("session.running")],[t("session.duration"),hasDate(detail.session.started_at)?formatDuration(Math.max(0,(new Date(hasDate(detail.session.ended_at)?detail.session.ended_at:Date.now()).getTime()-new Date(detail.session.started_at).getTime())/1000)):t("value.unknown")],[t("ui.cpu.ff221"),detail.session.cpu_seconds?formatDuration(detail.session.cpu_seconds):t("value.unknown")],[t("ui.memory.89c8a"),detail.session.peak_rss_bytes?formatBytes(detail.session.peak_rss_bytes):t("value.unknown")],[t("ui.tokens.c38c6"),detail.usage_measured?formatTokens(total(detail.tokens)):t("value.unknown")],[t("ui.project.f6f4d"),sessionProject(detail.session)],["Session ID",detail.session.id]]}/>
+        <TerminalKV rows={[[t("session.start"),hasDate(detail.session.started_at)?formatDateTime(detail.session.started_at):t("value.unknown")],[t("session.end"),hasDate(detail.session.ended_at)?formatDateTime(detail.session.ended_at):t("session.running")],[t("session.duration"),hasDate(detail.session.started_at)?formatDuration(Math.max(0,(new Date(hasDate(detail.session.ended_at)?detail.session.ended_at:Date.now()).getTime()-new Date(detail.session.started_at).getTime())/1000)):t("value.unknown")],[t("ui.cpu.ff221"),detail.session.cpu_seconds?formatDuration(detail.session.cpu_seconds):t("value.unknown")],[t("ui.memory.89c8a"),detail.session.peak_rss_bytes?formatBytes(detail.session.peak_rss_bytes):t("value.unknown")],[t("ui.tokens.c38c6"),detail.usage_measured?formatTokens(total(detail.tokens)):t("value.unknown")],[`~${t("terminal.label_amount")}`,detail.usage_measured?(detail.api_money?formatMoneyValue(detail.api_money):formatMoney(detail.api_equivalent_usd)):t("value.unknown")],[t("ui.project.f6f4d"),sessionProject(detail.session)],["Session ID",detail.session.id]]}/>
+        <h3>{t("agent.provenance.title")}</h3>
+        <TerminalKV rows={[[t("agent.provenance.state"),<>{provenanceFeed(detail.session.provenance?.state||detail.session.source)}{detail.session.provenance?.state==="log"&&hasDate(detail.session.at)?` (${t("agent.provenance.at",{time:formatDateTime(detail.session.at)})})`:""}</>],[t("agent.provenance.tokens"),provenanceFeed(detail.session.provenance?.tokens)],[t("agent.provenance.speed"),detail.session.provenance?.speed==="estimated"?t(detail.session.provenance?.speed_feed==="log"?"agent.provenance.log_timing":"agent.provenance.otlp_timing"):provenanceFeed(detail.session.provenance?.speed)],[t("agent.provenance.cost"),detail.usage_measured?t("agent.provenance.cost_detail"):t("value.unknown")],[t("agent.provenance.resources"),detail.session.provenance?.resources==="process"?`${provenanceFeed("process")}${detail.session.pid?` (${t("agent.provenance.pid",{pid:detail.session.pid})})`:""}`:t("value.unknown")],[t("agent.provenance.model"),provenanceFeed(detail.session.provenance?.model)],[t("agent.provenance.project"),provenanceFeed(detail.session.provenance?.project)]]}/>
         <h3>{t("session.spawned")}</h3>{detail.processes.length?<ul>{detail.processes.map(p=><li key={p.pid}>{p.name} · {p.pid} · {formatBytes(p.memory_bytes)}{p.left_behind?` · ${t("project.left_behind")}`:""}</li>)}</ul>:<p>{t("session.no_spawned")}</p>}
         <SpeedPanel speed={detail.speed} host={host} session={detail.session.id}/>
       </section>:null}
@@ -543,7 +547,7 @@ function AgentTable({
                   t("ui.memory.by.process.d76ce"),
                   t("ui.tokens.c38c6"),
                   t("terminal.label_model"),
-                  t("terminal.label_source"),
+                  t("agent.source.tag"),
                 ]
           }
           rows={agents.map((a) => {
@@ -583,13 +587,13 @@ function AgentTable({
                     ? formatTokens(tokens.get(a.id)!)
                     : t("ui.unknown.bc781"),
                   a.model || t("value.unknown_model"),
-                  agentSource(a.source),
+                  <span className="terminal-dim">{sessionSourceTag(a)}</span>,
                 ];
           })}
         />
       </div>
       <p className="foot">
-        {" "}{t("ui.sessions.come.from.opentelemetry.and.local.sessi.9a18f")}{" "}</p>
+        {" "}{t("ui.sessions.come.from.opentelemetry.and.local.sessi.9a18f")}{" "} · {sessionSourceLegend()}</p>
     </>
   );
 }
@@ -608,7 +612,7 @@ function SpeedPanel({speed,host,session}: {speed:SpeedSummary[];host?:string;ses
   const [historical,setHistorical] = useState<SpeedSummary[]>([]);
   useEffect(()=>{if(window!=="24h"||!host)return;let active=true;get<SpeedSummary[]>(`/api/v1/hosts/${encodeURIComponent(host)}/ai/speed?range=24h${session?`&session=${encodeURIComponent(session)}`:""}`).then(rows=>{if(active)setHistorical(rows)}).catch(()=>{if(active)setHistorical([])});return()=>{active=false}},[window,host,session]);
   const visible=window==="24h"?historical:speed;
-  return <><div className="speed-controls"><button aria-pressed={window==="1h"} onClick={()=>setWindow("1h")}>{t("speed.one_hour")}</button><button aria-pressed={window==="24h"} onClick={()=>setWindow("24h")}>{t("speed.day")}</button></div>{!visible.length?<Empty>{t("speed.no_data")}</Empty>:<TerminalTable heads={[t("terminal.label_model"),t("ui.method.88306"),t("terminal.label_tokens_second"),t("terminal.label_median"),t("terminal.label_p95"),t("terminal.label_tokens_minute"),t("terminal.label_requests_minute"),t("terminal.label_errors"),t("terminal.label_retries")]} right={[2,3,4,5,6,7,8]} rows={visible.map(s=>[`${agentName(s.kind)} · ${s.model||t("value.unknown_model")}`,s.method,s.live_tokens_per_second===null?"—":`${s.method==="estimated"?"~":""}${formatNumber(s.live_tokens_per_second,1)}`,s.median_tokens_per_second===null?"—":formatNumber(s.median_tokens_per_second,1),s.p95_tokens_per_second===null?"—":formatNumber(s.p95_tokens_per_second,1),formatNumber(s.tokens_per_minute,1),formatNumber(s.requests_per_minute,1),String(s.api_errors),String(s.retries)])}/>}</>;
+  return <><div className="speed-controls"><button aria-pressed={window==="1h"} onClick={()=>setWindow("1h")}>{t("speed.one_hour")}</button><button aria-pressed={window==="24h"} onClick={()=>setWindow("24h")}>{t("speed.day")}</button></div>{!visible.length?<Empty>{t("speed.no_data")}</Empty>:<TerminalTable heads={[t("terminal.label_model"),t("ui.method.88306"),t("terminal.label_tokens_second"),t("terminal.label_median"),t("terminal.label_p95"),t("terminal.label_tokens_minute"),t("terminal.label_requests_minute"),t("terminal.label_errors"),t("terminal.label_retries")]} right={[2,3,4,5,6,7,8]} rows={visible.map(s=>[`${agentName(s.kind)} · ${s.model||t("value.unknown_model")}`,s.method,s.live_tokens_per_second===null?"—":`${s.method==="estimated"?"~":""}${formatNumber(s.live_tokens_per_second,1)}`,s.median_tokens_per_second===null?"—":`${s.method==="estimated"?"~":""}${formatNumber(s.median_tokens_per_second,1)}`,s.p95_tokens_per_second===null?"—":`${s.method==="estimated"?"~":""}${formatNumber(s.p95_tokens_per_second,1)}`,formatNumber(s.tokens_per_minute,1),formatNumber(s.requests_per_minute,1),String(s.api_errors),String(s.retries)])}/>}</>;
 
 }
 function UsageTile({ usage }: { usage: Usage[] }) {
@@ -1770,7 +1774,7 @@ function App() {
             </div>
           ) : null}
           {view === "glossary" ? (
-            <div className="terminal-grid"><section className="terminal-box terminal-span-12" aria-label={t("terminal.glossary")}><h2>{t("terminal.glossary")}</h2><div className="terminal-box-body"><p>{t("terminal.glossary_intro")}</p><p>{t("terminal.glossary_bar")}</p><p>{t("terminal.glossary_unknown")}</p><p className="terminal-warn">{t("terminal.glossary_warn")}</p><p className="terminal-crit">{t("terminal.glossary_crit")}</p></div></section></div>
+            <div className="terminal-grid"><section className="terminal-box terminal-span-12" aria-label={t("terminal.glossary")}><h2>{t("terminal.glossary")}</h2><div className="terminal-box-body"><p>{t("terminal.glossary_intro")}</p><p>{t("terminal.glossary_bar")}</p><p>{t("terminal.glossary_unknown")}</p><p>{t("agent.glossary.otel")}</p><p>{t("agent.glossary.log")}</p><p>{t("agent.glossary.estimated")}</p><p className="terminal-warn">{t("terminal.glossary_warn")}</p><p className="terminal-crit">{t("terminal.glossary_crit")}</p></div></section></div>
           ) : view === "settings" ? (
             <SettingsView preferences={preferences} onChange={changePreferences} onReset={() => changePreferences(serverDefaults)} />
           ) : !host ? (

@@ -37,3 +37,19 @@ describe("terminal text rendering", () => {
     expect(measuredSpeed([speed("fast",12),speed("idle",0),speed("fast",8)]).map(x=>[x.model,x.rate])).toEqual([["fast",12]]);
   });
 });
+
+describe("session source labels", () => {
+  it("shows all feed combinations and a translated legend", async () => {
+    const {sessionSourceTag, sessionSourceLegend} = await import("./data");
+    const {setLanguage} = await import("./i18n");
+    expect(sessionSourceTag({source:"otlp"})).toBe("otel");
+    expect(sessionSourceTag({source:"log"})).toBe("log");
+    expect(sessionSourceTag({source:"otlp",sources:["otlp","log","process"]})).toBe("otel+log");
+    expect(sessionSourceTag({source:"process"})).toBe("proc");
+    setLanguage("en");
+    expect(sessionSourceLegend()).toBe("otel = OpenTelemetry · log = local logs · ~ = estimated");
+    setLanguage("fr");
+    expect(sessionSourceLegend()).toContain("journaux locaux");
+    setLanguage("en");
+  });
+});

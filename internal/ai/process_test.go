@@ -128,3 +128,31 @@ func TestMergeSessionsKeepsOTLPAndNewerTurnState(t *testing.T) {
 		t.Fatalf("merged session: %+v", got)
 	}
 }
+
+func TestMergeSessionProvenance(t *testing.T) {
+	now := time.Now().UTC()
+	cases := []struct {
+		name                  string
+		input                 []model.AgentSession
+		sources               []string
+		state, model, project string
+	}{
+		{"otlp only", []model.AgentSession{{ID: "one", Source: "otlp", At: now, State: "working", Model: "model-a", Project: "demo"}}, []string{"otlp"}, "otlp", "otlp", "otlp"},
+		{"log only", []model.AgentSession{{ID: "one", Source: "log", At: now, State: "working", Model: "model-a", Project: "demo"}}, []string{"log"}, "log", "log", "log"},
+		{"both", []model.AgentSession{{ID: "one", Source: "otlp", At: now.Add(-time.Minute), State: "working", Model: "model-a"}, {ID: "one", Source: "log", At: now, State: "waiting-for-input", Project: "demo"}}, []string{"otlp", "log"}, "log", "otlp", "log"},
+		{"process only", []model.AgentSession{{ID: "one", Source: "process", At: now, State: "running", PID: 123, Project: "demo"}}, []string{"process"}, "process", "", "process"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := MergeSessions(tc.input)
+			if len(got) != 1 || got[0].Provenance.State != tc.state || got[0].Provenance.Model != tc.model || got[0].Provenance.Project != tc.project || got[0].State != tc.input[len(tc.input)-1].State {
+				t.Fatalf("provenance: %+v", got)
+			}
+			for _, source := range tc.sources {
+				if !containsSource(got[0].Sources, source) {
+					t.Fatalf("missing %s: %+v", source, got[0].Sources)
+				}
+			}
+		})
+	}
+}

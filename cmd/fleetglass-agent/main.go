@@ -321,6 +321,7 @@ func (a *agent) send(results []model.Result) {
 			data.Sessions[i].RSS = v.RSS
 			data.Sessions[i].CPUSeconds = v.CPUSeconds
 			data.Sessions[i].PeakRSSBytes = v.PeakRSSBytes
+			ai.NormalizeProvenance(&data.Sessions[i])
 		}
 	}
 	ai.ApplyHealth(data.Sessions, processes, data.Quotas, now)

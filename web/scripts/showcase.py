@@ -55,6 +55,10 @@ def session(number, kind, project, model, cpu, memory):
 fixture.AGENTS = [session(1, "claude", "atlas", "claude-sonnet-4-5", 7.2, 480),
                   session(2, "codex", "orbit", "gpt-6-sol", 5.1, 360),
                   session(3, "claude", "ledger", "claude-sonnet-4-5", 3.4, 410)]
+fixture.AGENTS[0].update({"source":"otlp", "sources":["otlp","process"], "provenance":{"state":"otlp","tokens":"otlp","speed":"estimated","cost":"estimated","resources":"process","model":"otlp","project":"process"}})
+fixture.AGENTS[1].update({"source":"log", "sources":["log","process"], "provenance":{"state":"log","tokens":"log","speed":"estimated","cost":"estimated","resources":"process","model":"log","project":"process"}})
+fixture.AGENTS[2].update({"source":"otlp", "sources":["otlp","log","process"], "provenance":{"state":"log","tokens":"otlp","speed":"otlp","cost":"estimated","resources":"process","model":"log","project":"log"}})
+fixture.AGENTS.append({"id":"demo-process-only", "label":"codex · demo · process", "kind":"codex", "project":"demo", "worktree":"", "pid":2499, "at":fixture.iso(), "state":"running", "reason":"process alive", "source":"process", "sources":["process"], "provenance":{"state":"process","resources":"process","project":"process"}})
 fixture.USAGE = [
     {"name": name, "tokens": fixture.tokens(count), "hourly": [],
      "daily": [{"at": fixture.iso(-86400 * i), "tokens": fixture.tokens(round(count / 7))} for i in range(7)]}

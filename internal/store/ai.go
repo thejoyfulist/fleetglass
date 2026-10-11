@@ -39,17 +39,16 @@ func ingestAI(tx *sql.Tx, host string, data *model.AI) error {
 		if e != nil && e != sql.ErrNoRows {
 			return e
 		}
-		if prevSource == "otlp" && s.Source == "log" {
-			continue
-		}
 		if prevAt > s.At.UnixNano() && prevSource == s.Source {
 			continue
 		}
+		ai.NormalizeProvenance(&s)
 		if s.StartedAt.IsZero() {
 			s.StartedAt = s.At
 		}
 		var previous model.AgentSession
 		if json.Unmarshal([]byte(previousRaw), &previous) == nil {
+			s = ai.MergeSessions([]model.AgentSession{previous, s})[0]
 			if !previous.StartedAt.IsZero() && previous.StartedAt.Before(s.StartedAt) {
 				s.StartedAt = previous.StartedAt
 			}
@@ -67,11 +66,6 @@ func ingestAI(tx *sql.Tx, host string, data *model.AI) error {
 		if _, e = tx.Exec(`INSERT OR REPLACE INTO ai_sessions VALUES(?,?,?,?,?)`, host, s.ID, s.At.UnixNano(), s.Source, string(b)); e != nil {
 			return e
 		}
-		if s.Source == "otlp" {
-			if _, e = tx.Exec(`DELETE FROM ai_usage WHERE host_id=? AND session_id=? AND source='log'`, host, s.ID); e != nil {
-				return e
-			}
-		}
 	}
 	for _, u := range data.Usage {
 		if !hashedID.MatchString(u.ID) || !hashedID.MatchString(u.Session) || (u.Kind != "claude" && u.Kind != "codex") || (u.Source != "otlp" && u.Source != "log") {
@@ -82,12 +76,16 @@ func ingestAI(tx *sql.Tx, host string, data *model.AI) error {
 		}
 		if u.Source == "log" {
 			var n int
-			e := tx.QueryRow(`SELECT COUNT(*) FROM ai_sessions WHERE host_id=? AND id=? AND source='otlp'`, host, u.Session).Scan(&n)
-			if e != nil {
+			if e := tx.QueryRow(`SELECT COUNT(*) FROM ai_usage WHERE host_id=? AND session_id=? AND source='otlp'`, host, u.Session).Scan(&n); e != nil {
 				return e
 			}
 			if n > 0 {
 				continue
+			}
+		}
+		if u.Source == "otlp" {
+			if _, e := tx.Exec(`DELETE FROM ai_usage WHERE host_id=? AND session_id=? AND source='log'`, host, u.Session); e != nil {
+				return e
 			}
 		}
 		b, _ := json.Marshal(u)
@@ -161,7 +159,7 @@ func (s *Store) AgentsWithSummary(host string, overrides map[string]model.AIPric
 		for i, id := range ids[start:end] {
 			args[i+1] = id
 		}
-		query := `SELECT data FROM ai_usage WHERE host_id=? AND session_id IN (` + strings.TrimSuffix(strings.Repeat("?,", end-start), ",") + `)`
+		query := `SELECT u.data FROM ai_usage u WHERE u.host_id=? AND u.session_id IN (` + strings.TrimSuffix(strings.Repeat("?,", end-start), ",") + `) AND (u.source='otlp' OR NOT EXISTS (SELECT 1 FROM ai_usage preferred WHERE preferred.host_id=u.host_id AND preferred.session_id=u.session_id AND preferred.source='otlp'))`
 		rows, err := s.DB.Query(query, args...)
 		if err != nil {
 			return nil, err
@@ -181,8 +179,13 @@ func (s *Store) AgentsWithSummary(host string, overrides map[string]model.AIPric
 				continue
 			}
 			v := &sessions[i]
+			if !containsSessionSource(v.Sources, u.Source) {
+				v.Sources = append(v.Sources, u.Source)
+			}
 			if u.Tokens.Input+u.Tokens.Output+u.Tokens.CacheRead+u.Tokens.CacheWrite > 0 {
 				v.UsageMeasured = true
+				v.Provenance.Tokens = u.Source
+				v.Provenance.Cost = "estimated"
 			}
 			if price, ok := modelPrice(prices, u.Model); ok {
 				v.APIEquivalentUSD += (float64(u.Tokens.Input)*price.Input + float64(u.Tokens.Output)*price.Output + float64(u.Tokens.CacheWrite)*price.CacheWrite + float64(u.Tokens.CacheRead)*price.CacheRead) / 1e6
@@ -191,6 +194,12 @@ func (s *Store) AgentsWithSummary(host string, overrides map[string]model.AIPric
 				rate := u.OutputTokensPerSecond
 				v.SpeedTokensPerSecond = &rate
 				v.SpeedMethod = u.SpeedMethod
+				v.Provenance.SpeedFeed = u.Source
+				if u.SpeedMethod == "estimated" {
+					v.Provenance.Speed = "estimated"
+				} else {
+					v.Provenance.Speed = u.Source
+				}
 				latest[u.Session] = u.At
 			}
 		}
@@ -201,6 +210,15 @@ func (s *Store) AgentsWithSummary(host string, overrides map[string]model.AIPric
 		}
 	}
 	return sessions, nil
+}
+
+func containsSessionSource(sources []string, source string) bool {
+	for _, value := range sources {
+		if value == source {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) agentsAt(host string, now time.Time) ([]model.AgentSession, error) {
@@ -217,6 +235,7 @@ func (s *Store) agentsAt(host string, now time.Time) ([]model.AgentSession, erro
 			return nil, e
 		}
 		if json.Unmarshal([]byte(b), &v) == nil {
+			ai.NormalizeProvenance(&v)
 			v.Label = SessionLabel(v)
 			// A persisted session can outlive its last agent report. Without a
 			// matched PID, its age alone is enough to establish that it ended.

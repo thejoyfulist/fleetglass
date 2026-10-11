@@ -12,6 +12,7 @@ export interface Result {
   at?: string;
   cadence_seconds?: number;
 }
+export interface SessionProvenance {state?:string;tokens?:string;cost?:string;speed?:string;speed_feed?:string;resources?:string;model?:string;project?:string}
 export interface Session {
   id: string;
   label?: string;
@@ -35,6 +36,8 @@ export interface Session {
   reason: string;
   reason_code?: string;
   source: string;
+  sources?: string[];
+  provenance?: SessionProvenance;
   session_count?: number;
 }
 export function sessionProject(session: Session): string { return session.project && session.project !== "unmatched" ? session.project : "—"; }
@@ -45,7 +48,7 @@ export function sessionDisplayLabel(session: Session): string {
   return [session.kind, location, session.id.slice(0,8)].filter(Boolean).join(" · ");
 }
 export interface Money { original:number; currency:string; converted:number|null; display_currency:string; rate?:number; rate_source?:string; rate_date?:string }
-export interface SessionDetail {session:Session;tokens:Tokens;usage_measured:boolean;tokens_per_minute:number;api_equivalent_usd:number;cli_reported_usd:number;api_money?:Money;cli_money?:Money;unpriced_tokens:number;processes:ProjectProcess[];speed:SpeedSummary[]}
+export interface SessionDetail {session:Session;sources?:string[];provenance?:SessionProvenance;tokens_by_source?:Record<string,Tokens>;tokens:Tokens;usage_measured:boolean;tokens_per_minute:number;api_equivalent_usd:number;cli_reported_usd:number;api_money?:Money;cli_money?:Money;unpriced_tokens:number;processes:ProjectProcess[];speed:SpeedSummary[]}
 export interface Overview {
   host_id: string;
   at: string;
@@ -547,4 +550,22 @@ export function saveTheme(
 }
 export function reconnectDelay(attempt: number) {
   return Math.min(30000, 1000 * 2 ** Math.min(attempt, 5));
+}
+
+export function sessionSourceTag(session: Pick<Session,"source"|"sources">): string {
+  const feeds = session.sources?.length ? session.sources : [session.source];
+  const otel = feeds.includes("otlp") || feeds.includes("otel");
+  const log = feeds.includes("log") || feeds.includes("local log");
+  if (otel && log) return "otel+log";
+  if (otel) return "otel";
+  if (log) return "log";
+  return feeds.includes("process") ? "proc" : "—";
+}
+export function sessionSourceLegend(): string { return t("agent.source.legend"); }
+export function provenanceFeed(feed?: string): string {
+  if (feed === "otlp" || feed === "otel") return t("agent.provenance.otlp");
+  if (feed === "log" || feed === "local log") return t("agent.provenance.log");
+  if (feed === "process") return t("agent.provenance.process");
+  if (feed === "estimated") return t("agent.provenance.estimated");
+  return t("value.unknown");
 }

@@ -413,3 +413,66 @@ func TestClaudeQuotaEstimateLabel(t *testing.T) {
 		t.Fatalf("estimates: %+v", q)
 	}
 }
+
+func TestMixedSessionProvenanceInListAndDetail(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "provenance.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	id := strings.Repeat("a", 64)
+	logSession := model.AgentSession{ID: id, Kind: "codex", Source: "log", At: now, State: "waiting-for-input", Project: "demo", Model: "model-a"}
+	otlpSession := model.AgentSession{ID: id, Kind: "codex", Source: "otlp", At: now.Add(-time.Minute), State: "working"}
+	usage := model.AIUsage{ID: strings.Repeat("b", 64), Session: id, Kind: "codex", Model: "model-a", Source: "otlp", At: now, Tokens: model.Tokens{Input: 42}, OutputTokensPerSecond: 8, SpeedMethod: "otlp"}
+	for _, batch := range []model.Batch{{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{otlpSession}, Usage: []model.AIUsage{usage}}}, {HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{logSession}}}} {
+		if err := s.Ingest(batch); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list, err := s.AgentsWithSummary("host", map[string]model.AIPrice{"model-a": {Input: 2}})
+	if err != nil || len(list) != 1 {
+		t.Fatalf("list: %+v %v", list, err)
+	}
+	row := list[0]
+	if row.Source != "otlp" || row.Provenance.State != "log" || row.Provenance.Tokens != "otlp" || row.Provenance.Cost != "estimated" || row.Provenance.Speed != "otlp" || !containsSessionSource(row.Sources, "log") {
+		t.Fatalf("list provenance: %+v", row)
+	}
+	detail, err := s.SessionDetail("host", id, map[string]model.AIPrice{"model-a": {Input: 2}})
+	if err != nil || detail.Tokens.Input != 42 || detail.TokensBySource["otlp"].Input != 42 || detail.Provenance.State != "log" || detail.Provenance.Tokens != "otlp" {
+		t.Fatalf("detail: %+v %v", detail, err)
+	}
+}
+
+func TestLogTokensRemainUntilOTLPUsageArrives(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "fallback.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	id := strings.Repeat("a", 64)
+	logUsage := model.AIUsage{ID: strings.Repeat("b", 64), Session: id, Kind: "codex", Model: "model-a", Source: "log", At: now, Tokens: model.Tokens{Input: 12}}
+	otlp := model.AgentSession{ID: id, Kind: "codex", Source: "otlp", At: now, State: "working"}
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{otlp}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Usage: []model.AIUsage{logUsage}}}); err != nil {
+		t.Fatal(err)
+	}
+	list, err := s.AgentsWithSummary("host", nil)
+	if err != nil || len(list) != 1 || list[0].Provenance.Tokens != "log" {
+		t.Fatalf("fallback: %+v %v", list, err)
+	}
+	otlpUsage := logUsage
+	otlpUsage.ID = strings.Repeat("c", 64)
+	otlpUsage.Source = "otlp"
+	otlpUsage.Tokens.Input = 24
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Usage: []model.AIUsage{otlpUsage}}}); err != nil {
+		t.Fatal(err)
+	}
+	detail, err := s.SessionDetail("host", id, nil)
+	if err != nil || detail.Tokens.Input != 24 || detail.Provenance.Tokens != "otlp" {
+		t.Fatalf("preferred: %+v %v", detail, err)
+	}
+}

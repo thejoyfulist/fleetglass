@@ -105,12 +105,46 @@ func outsideProject(cwd string) string {
 	return project
 }
 
-// MergeSessions keeps one record per session before assigning processes.
-// OTLP remains the preferred source, while a newer log can supply turn state.
+// NormalizeProvenance records the feed that supplied each session field.
+func NormalizeProvenance(s *model.AgentSession) {
+	if len(s.Sources) == 0 && s.Source != "" {
+		s.Sources = []string{s.Source}
+	}
+	if s.Provenance.State == "" {
+		s.Provenance.State = s.Source
+	}
+	if s.Provenance.Model == "" && s.Model != "" {
+		s.Provenance.Model = s.Source
+	}
+	if s.Provenance.Project == "" && (s.Project != "" || s.Worktree != "") {
+		s.Provenance.Project = s.Source
+	}
+	if s.PID != 0 {
+		s.Provenance.Resources = "process"
+		if !containsSource(s.Sources, "process") {
+			s.Sources = append(s.Sources, "process")
+		}
+	}
+	if s.Provenance.Tokens != "" {
+		s.Provenance.Cost = "estimated"
+	}
+}
+
+func containsSource(sources []string, source string) bool {
+	for _, value := range sources {
+		if value == source {
+			return true
+		}
+	}
+	return false
+}
+
+// MergeSessions keeps all observed feeds and the origin of the chosen fields.
 func MergeSessions(sessions []model.AgentSession) []model.AgentSession {
 	out := make([]model.AgentSession, 0, len(sessions))
 	byID := map[string]int{}
 	for _, s := range sessions {
+		NormalizeProvenance(&s)
 		idx, ok := byID[s.ID]
 		if !ok {
 			byID[s.ID] = len(out)
@@ -119,24 +153,39 @@ func MergeSessions(sessions []model.AgentSession) []model.AgentSession {
 		}
 		old := out[idx]
 		preferred, other := old, s
-		if s.Source == "otlp" || (old.Source != "otlp" && s.At.After(old.At)) {
+		if s.Source == "otlp" && old.Source != "otlp" || (s.Source == old.Source && s.At.After(old.At)) {
 			preferred, other = s, old
+		}
+		for _, source := range other.Sources {
+			if !containsSource(preferred.Sources, source) {
+				preferred.Sources = append(preferred.Sources, source)
+			}
 		}
 		if preferred.Project == "" || preferred.Project == "unknown" {
 			preferred.Project = other.Project
+			preferred.Provenance.Project = other.Provenance.Project
 		}
 		if preferred.Worktree == "" {
 			preferred.Worktree = other.Worktree
+			preferred.Provenance.Project = other.Provenance.Project
 		}
 		if preferred.Model == "" {
 			preferred.Model = other.Model
+			preferred.Provenance.Model = other.Provenance.Model
 		}
 		if other.At.After(preferred.At) {
 			preferred.At = other.At
+			preferred.State = other.State
+			preferred.Reason = other.Reason
+			preferred.ReasonCode = other.ReasonCode
 			preferred.LastTurnEnded = other.LastTurnEnded
+			preferred.Provenance.State = other.Provenance.State
 		}
 		if preferred.StartedAt.IsZero() || !other.StartedAt.IsZero() && other.StartedAt.Before(preferred.StartedAt) {
 			preferred.StartedAt = other.StartedAt
+		}
+		if preferred.Provenance.Resources == "" {
+			preferred.Provenance.Resources = other.Provenance.Resources
 		}
 		out[idx] = preferred
 	}
@@ -190,6 +239,11 @@ func Enrich(sessions []model.AgentSession, processes []Process, roots []string, 
 			sessions[i].User = u.Username
 		}
 		sessions[i].Project, sessions[i].Worktree = projectForRoots(p.CWD, roots)
+		sessions[i].Provenance.Project = "process"
+		sessions[i].Provenance.Resources = "process"
+		if !containsSource(sessions[i].Sources, "process") {
+			sessions[i].Sources = append(sessions[i].Sources, "process")
+		}
 	}
 }
 
@@ -236,6 +290,7 @@ func ProcessSessions(sessions []model.AgentSession, processes []Process, roots [
 			username = u.Username
 		}
 		sessions = append(sessions, model.AgentSession{ID: Hash(fmt.Sprintf("process:%d:%d:%d", p.PID, p.UID, p.StartTime)), Kind: kind, Project: project, Worktree: worktree, User: username, PID: p.PID, At: at, StartedAt: at, State: "running", Reason: "process alive; session activity unavailable", Source: "process"})
+		NormalizeProvenance(&sessions[len(sessions)-1])
 		claimed[p.PID] = true
 	}
 	return sessions

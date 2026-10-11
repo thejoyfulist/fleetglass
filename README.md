@@ -150,6 +150,8 @@ Alert delivery and incident workflows (ntfy, Telegram, email), then broader agen
 
 **Does it work without Claude or Codex?** Yes. Machine, service, project, and uptime monitoring work independently.
 
+**Can I tell measured from estimated?** Yes. Session provenance shows each metric’s feed, and `~` marks estimated speed and API-equivalent cost.
+
 **Multiple servers?** Yes. Enroll remote agents with HTTPS and per-host tokens; see [multi-server setup](docs/MULTI-SERVER.md).
 
 ## Docs
