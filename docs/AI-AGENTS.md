@@ -29,6 +29,6 @@ For fallback, configure `ai_log_roots` and grant only those roots read/traverse 
 
 ## Where each number comes from
 
-Session rows show a compact `src` tag: `otel` for OpenTelemetry, `log` for local session logs, `otel+log` when both were seen, and `proc` for a process-only session. The session detail lists the feed chosen for state/turn, tokens, speed, model, project/worktree, and CPU/RSS. An OTLP session can retain a newer turn state from local logs; OTLP token observations take precedence over log totals for the same session. CPU and RSS are attributed from the matching process tree.
+Session rows show a compact `src` tag: `otel` for OpenTelemetry, `log` for local session logs, `otel+log` when both were seen, and `proc` for a process-only session. Open the `src` cell to see the session detail: each metric has its own feed tag. For example, a mixed-source session can show `tokens 920 K otel`, `state working log`, `cpu 7.2% proc`, `speed ~15.2 tok/s est. (otel timing)`, and `~amount $7.92 est.`. A missing value is `-` without a feed tag. An OTLP session can retain a newer turn state from local logs; OTLP token observations take precedence over log totals for the same session. CPU and RSS are attributed from the matching process tree.
 
 `~` marks estimates. Speed from request duration telemetry is measured; speed inferred from log timing is estimated. The `~amount` heading marks the API-equivalent amount as an estimate computed from token counts and the configured model price table, never an invoice. Unknown measurements remain unknown.

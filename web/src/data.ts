@@ -569,3 +569,9 @@ export function provenanceFeed(feed?: string): string {
   if (feed === "estimated") return t("agent.provenance.estimated");
   return t("value.unknown");
 }
+export function detailMetric(value: string | null | undefined, feed?: string, timingFeed?: string): {value:string; tag:string} {
+  if (!value || value === "—" || value === "-") return {value:"-", tag:""};
+  const short = feed === "otlp" || feed === "otel" ? "otel" : feed === "local log" || feed === "log" ? "log" : feed === "process" ? "proc" : feed === "estimated" ? "est." : "";
+  const timing = timingFeed === "otlp" || timingFeed === "otel" ? "otel" : timingFeed === "log" || timingFeed === "local log" ? "log" : "";
+  return {value, tag:short === "est." && timing ? `est. (${timing} timing)` : short};
+}

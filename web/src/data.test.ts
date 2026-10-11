@@ -6,6 +6,7 @@ import {
   agentState,
   cockpitNetwork,
   cockpitServices,
+  detailMetric,
   formatBytes,
   formatDuration,
   formatMoney,
@@ -70,6 +71,19 @@ describe("formatting", () => {
     expect(sessionProject(session)).toBe("—");
     expect(sessionDisplayLabel(session)).toBe("claude · coordination · abcdef12");
     expect(sessionDisplayLabel({...session,worktree:"",model:"claude-opus-4"})).toBe("claude · abcdef12");
+  });
+});
+describe("session metric provenance", () => {
+  it("pairs each present value with its selected feed", () => {
+    expect(detailMetric("920 K", "otlp")).toEqual({value:"920 K", tag:"otel"});
+    expect(detailMetric("working", "log")).toEqual({value:"working", tag:"log"});
+    expect(detailMetric("7.2%", "process")).toEqual({value:"7.2%", tag:"proc"});
+    expect(detailMetric("$7.92", "estimated")).toEqual({value:"$7.92", tag:"est."});
+    expect(detailMetric("~15.2 tok/s", "estimated", "otlp")).toEqual({value:"~15.2 tok/s", tag:"est. (otel timing)"});
+  });
+  it("omits a feed for missing values", () => {
+    expect(detailMetric(null, "process")).toEqual({value:"-", tag:""});
+    expect(detailMetric("—", "otlp")).toEqual({value:"-", tag:""});
   });
 });
 describe("observation titles", () => {

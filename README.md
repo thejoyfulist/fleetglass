@@ -100,6 +100,8 @@ See [agent setup](docs/AI-AGENTS.md) for attribution, local log fallback, and qu
   <tr><td><a href="assets/screenshots/apps-dark.png"><img src="assets/screenshots/apps-dark.png" width="420" alt="Synthetic dark apps view"></a></td><td><a href="assets/screenshots/projects-dark.png"><img src="assets/screenshots/projects-dark.png" width="420" alt="Synthetic dark projects view"></a></td></tr>
 </table>
 
+Session metric sources: [light detail](assets/screenshots/agents-detail-light.png) · [dark detail](assets/screenshots/agents-detail-dark.png).
+
 Keyboard shortcuts: `1`–`9` views, `r` range, `/` search, `t` theme. The cockpit has light and dark themes and a mobile layout. [See the full screenshot set](assets/screenshots/).
 
 ## Ask it from your agents (MCP)

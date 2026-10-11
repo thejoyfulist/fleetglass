@@ -24,7 +24,7 @@ fixture.AGENTS[2].update({"id": "0b82eee0abcd", "kind": "claude", "project": "un
 fixture.AGENTS[0].update({"source":"otlp", "sources":["otlp","process"], "provenance":{"state":"otlp","tokens":"otlp","speed":"estimated","cost":"estimated","resources":"process","model":"otlp","project":"process"}})
 fixture.AGENTS[1].update({"source":"log", "sources":["log","process"], "provenance":{"state":"log","tokens":"log","speed":"estimated","cost":"estimated","resources":"process","model":"log","project":"process"}})
 fixture.AGENTS[2].update({"source":"otlp", "sources":["otlp","log","process"], "provenance":{"state":"log","tokens":"otlp","speed":"otlp","cost":"estimated","resources":"process","model":"log","project":"log"}})
-fixture.AGENTS.append({"id":"process-only-demo", "kind":"codex", "project":"demo", "worktree":"", "at":fixture.iso(), "state":"running", "reason":"process alive", "source":"process", "sources":["process"], "provenance":{"state":"process","resources":"process","project":"process"}, "pid":2999, "model":""})
+fixture.AGENTS.append({"id":"process-only-demo", "kind":"codex", "project":"demo", "worktree":"", "at":fixture.iso(), "state":"running", "reason":"process alive", "source":"process", "sources":["process"], "provenance":{"state":"process","resources":"process","project":"process"}, "pid":2999, "cpu_percent":1.0, "rss_bytes":128*1024**2, "model":""})
 fixture.QUOTAS[:] = [{"kind": "codex", "window": "primary", "window_minutes": 10080,
                       "used_percent": 42, "resets_at": fixture.iso(4 * 86400),
                       "observed_at": fixture.iso(), "method": "cli_reported"}]
@@ -112,6 +112,7 @@ def inspect_sticky_tabs(page):
         document.querySelector('main').style.minHeight = `${innerHeight * 2}px`;
       }
     }""")
+
     page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
     page.wait_for_timeout(100)
     return page.evaluate("""() => {
@@ -128,6 +129,28 @@ def inspect_sticky_tabs(page):
         row.scrollLeft = row.scrollWidth;
         if (row.scrollLeft < 1) errors.push('tab row cannot scroll horizontally');
       }
+      return errors;
+    }""")
+
+def inspect_detail_metrics(page):
+    page.locator('.agent-table .terminal-link').first.click()
+    page.locator('#session-detail .session-metric').first.wait_for()
+    return page.evaluate("""() => {
+      const rows=[...document.querySelectorAll('#session-detail .session-metric')];
+      const errors=[];
+      if(document.documentElement.scrollWidth>innerWidth+1) errors.push('page horizontal scroll with detail open');
+      if(rows.length!==8) errors.push(`expected 8 metric rows, got ${rows.length}`);
+      const x=[];
+      for(const row of rows){
+        const cells=[...row.children];
+        if(cells.length!==3) {errors.push('metric row missing feed column');continue}
+        const [label,value,feed]=cells;
+        if(value.textContent.trim()!=='-' && !feed.textContent.trim()) errors.push(`missing feed: ${label.textContent}`);
+        if(value.textContent.trim()==='-' && feed.textContent.trim()) errors.push(`feed on missing value: ${label.textContent}`);
+        if(row.scrollWidth>row.clientWidth+1 || feed.getBoundingClientRect().right>innerWidth+1) errors.push(`metric clipped: ${label.textContent}`);
+        x.push(feed.getBoundingClientRect().left);
+      }
+      if(x.length && Math.max(...x)-Math.min(...x)>1) errors.push('feed columns misaligned');
       return errors;
     }""")
 
@@ -165,7 +188,7 @@ def main():
                         agents_panel=page.get_by_role('region',name='AI agents')
                         if not agents_panel.get_by_role('columnheader',name='src').is_visible(): errors.append(f"{theme}: source column missing")
                         if not all(tag in agents_text for tag in ('otel+log','otel','log','proc')): errors.append(f"{theme}: source cases missing")
-                        if 'otel = OpenTelemetry · log = local logs · ~ = estimated' not in agents_text: errors.append(f"{theme}: source legend missing")
+                        if 'otel = OpenTelemetry · log = local logs · proc = process · est. = estimated' not in agents_text: errors.append(f"{theme}: source legend missing")
                         if 'session · 0b82' in agents_text or '0b82eee0' not in agents_text: errors.append(f"{theme}: unknown-location session ID clipped")
                         network_text=page.get_by_role('region',name='Network').inner_text()
                         if 'containers (' not in network_text or 'more' not in network_text: errors.append(f"{theme}: network grouping or overflow link missing")
@@ -184,6 +207,7 @@ def main():
                         errors.extend(f"{view}-{theme}-1280: {e}" for e in inspect(page,1280))
                         page.set_viewport_size({"width":1440,"height":900})
                     if view=="agents" and 'Claude · not reported' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: Agents quota status missing")
+                    if view=="agents": errors.extend(f"agents-{theme}-detail: {e}" for e in inspect_detail_metrics(page))
                     page.screenshot(path=str(OUT/f"{view}-{theme}.png"),full_page=True)
                     if view in ("overview", "agents"):
                         errors.extend(f"{view}-{theme}-desktop: {e}" for e in inspect_sticky_tabs(page))
@@ -221,6 +245,7 @@ def main():
                 for view in ("overview", "agents"):
                     mobile.goto(f"http://127.0.0.1:{server.server_port}/{'' if view=='overview' else view}",wait_until="networkidle")
                     errors.extend(f"{view}-{theme}-mobile: {e}" for e in inspect(mobile,390))
+                    if view=="agents": errors.extend(f"agents-{theme}-mobile-detail: {e}" for e in inspect_detail_metrics(mobile))
                     if view == "overview":
                         mobile.screenshot(path=str(OUT/f"overview-{theme}-mobile.png"),full_page=True)
                     errors.extend(f"{view}-{theme}-mobile: {e}" for e in inspect_sticky_tabs(mobile))

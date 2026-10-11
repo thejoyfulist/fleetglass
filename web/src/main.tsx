@@ -6,6 +6,7 @@ import {
   changeDetail,
   resultDetail,
   agentName,
+  detailMetric,
   provenanceFeed,
   sessionSourceTag,
   sessionSourceLegend,
@@ -519,26 +520,36 @@ function AgentTable({
     get<SessionDetail>(`/api/v1/hosts/${encodeURIComponent(host)}/agents/${encodeURIComponent(selected)}?display_currency=${currency}`).then(value=>{if(active)setDetail(value)}).catch(()=>{if(active)setDetail(null)});
     return () => {active=false};
   },[host,selected,compact,currency]);
+  useEffect(()=>{if(detail && location.hash==="#session-detail") document.getElementById("session-detail")?.scrollIntoView()},[detail]);
   const choose = (id:string) => {setSelected(id); history.replaceState(null,"",`/agents?session=${encodeURIComponent(id)}`)};
   const tokens = new Map(usage.map((u) => [u.name, total(u.tokens)]));
+  const numericCell = (label:string, value:React.ReactNode, feed?:string) => <span title={feed?`${label}: ${provenanceFeed(feed)}`:undefined}>{value}</span>;
   if (!agents.length) return <Empty>{t("ui.no.agent.sessions.reported.f9f1f")}</Empty>;
   return (
     <>
 
-      {!compact && detail?<section className="g t session-detail" id="session-detail"><div className="h"><h2>{t("session.title",{agent:agentName(detail.session.kind)})}</h2><span className="src">{detail.session.model||t("value.unknown_model")}</span></div>
-        <TerminalKV rows={[[t("session.start"),hasDate(detail.session.started_at)?formatDateTime(detail.session.started_at):t("value.unknown")],[t("session.end"),hasDate(detail.session.ended_at)?formatDateTime(detail.session.ended_at):t("session.running")],[t("session.duration"),hasDate(detail.session.started_at)?formatDuration(Math.max(0,(new Date(hasDate(detail.session.ended_at)?detail.session.ended_at:Date.now()).getTime()-new Date(detail.session.started_at).getTime())/1000)):t("value.unknown")],[t("ui.cpu.ff221"),detail.session.cpu_seconds?formatDuration(detail.session.cpu_seconds):t("value.unknown")],[t("ui.memory.89c8a"),detail.session.peak_rss_bytes?formatBytes(detail.session.peak_rss_bytes):t("value.unknown")],[t("ui.tokens.c38c6"),detail.usage_measured?formatTokens(total(detail.tokens)):t("value.unknown")],[`~${t("terminal.label_amount")}`,detail.usage_measured?(detail.api_money?formatMoneyValue(detail.api_money):formatMoney(detail.api_equivalent_usd)):t("value.unknown")],[t("ui.project.f6f4d"),sessionProject(detail.session)],["Session ID",detail.session.id]]}/>
-        <h3>{t("agent.provenance.title")}</h3>
-        <TerminalKV rows={[[t("agent.provenance.state"),<>{provenanceFeed(detail.session.provenance?.state||detail.session.source)}{detail.session.provenance?.state==="log"&&hasDate(detail.session.at)?` (${t("agent.provenance.at",{time:formatDateTime(detail.session.at)})})`:""}</>],[t("agent.provenance.tokens"),provenanceFeed(detail.session.provenance?.tokens)],[t("agent.provenance.speed"),detail.session.provenance?.speed==="estimated"?t(detail.session.provenance?.speed_feed==="log"?"agent.provenance.log_timing":"agent.provenance.otlp_timing"):provenanceFeed(detail.session.provenance?.speed)],[t("agent.provenance.cost"),detail.usage_measured?t("agent.provenance.cost_detail"):t("value.unknown")],[t("agent.provenance.resources"),detail.session.provenance?.resources==="process"?`${provenanceFeed("process")}${detail.session.pid?` (${t("agent.provenance.pid",{pid:detail.session.pid})})`:""}`:t("value.unknown")],[t("agent.provenance.model"),provenanceFeed(detail.session.provenance?.model)],[t("agent.provenance.project"),provenanceFeed(detail.session.provenance?.project)]]}/>
+      {!compact && detail?<section className="g t session-detail" id="session-detail"><div className="h"><h2>{t("session.title",{agent:agentName(detail.session.kind)})}</h2></div>
+        <TerminalKV rows={[[t("session.start"),hasDate(detail.session.started_at)?formatDateTime(detail.session.started_at):"-"],[t("session.end"),hasDate(detail.session.ended_at)?formatDateTime(detail.session.ended_at):t("session.running")],[t("session.duration"),hasDate(detail.session.started_at)?formatDuration(Math.max(0,(new Date(hasDate(detail.session.ended_at)?detail.session.ended_at:Date.now()).getTime()-new Date(detail.session.started_at).getTime())/1000)):"-"],["Session ID",detail.session.id]]}/>
+        <div className="session-metrics" aria-label={t("agent.provenance.title")}>{([
+          [t("ui.tokens.c38c6"),detailMetric(detail.usage_measured?formatTokens(total(detail.tokens)):null,detail.session.provenance?.tokens)],
+          [`~${t("terminal.label_amount")}`,detailMetric(detail.usage_measured?(detail.api_money?formatMoneyValue(detail.api_money):formatMoney(detail.api_equivalent_usd)):null,"estimated")],
+          [t("ui.cpu.ff221"),detailMetric(detail.session.pid && detail.session.cpu_percent !== undefined?formatPercent(detail.session.cpu_percent):null,detail.session.provenance?.resources)],
+          [t("ui.memory.89c8a"),detailMetric(detail.session.pid && detail.session.rss_bytes !== undefined?formatBytes(detail.session.rss_bytes):null,detail.session.provenance?.resources)],
+          [t("ui.state.a7250"),detailMetric(agentState(detail.session.state),detail.session.provenance?.state||detail.session.source)],
+          [t("terminal.speed"),detailMetric(detail.session.speed_tokens_per_second == null?null:`${detail.session.speed_method==="estimated"?"~":""}${detail.session.speed_tokens_per_second.toFixed(1)} tok/s`,detail.session.provenance?.speed,detail.session.provenance?.speed_feed)],
+          [t("terminal.label_model"),detailMetric(detail.session.model,detail.session.provenance?.model)],
+          [t("ui.project.f6f4d"),detailMetric(detail.session.project && detail.session.project!=="unmatched"?`${sessionProject(detail.session)} / ${detail.session.worktree||"-"}`:null,detail.session.provenance?.project)],
+        ] as [string,ReturnType<typeof detailMetric>][]).map(([label,metric])=><div className="session-metric" key={label}><span className="terminal-dim">{label}</span><span className="session-metric-value">{metric.value}</span><span className="session-metric-feed terminal-dim">{metric.tag}</span></div>)}</div>
         <h3>{t("session.spawned")}</h3>{detail.processes.length?<ul>{detail.processes.map(p=><li key={p.pid}>{p.name} · {p.pid} · {formatBytes(p.memory_bytes)}{p.left_behind?` · ${t("project.left_behind")}`:""}</li>)}</ul>:<p>{t("session.no_spawned")}</p>}
         <SpeedPanel speed={detail.speed} host={host} session={detail.session.id}/>
       </section>:null}
       <div className="agent-table">
         <Table
           rowIds={agents.map((a) => `session-${a.id}`)}
-          right={[3,4,5]}
+          right={compact?[2,3,4]:[3,4,5]}
           heads={
             compact
-              ? [t("ui.agent.5ce2e"), t("ui.state.a7250"), t("ui.cpu.ff221"), t("ui.memory.89c8a"), t("ui.tokens.c38c6")]
+              ? [t("ui.agent.5ce2e"), t("ui.state.a7250"), t("ui.cpu.ff221"), t("ui.memory.89c8a"), t("ui.tokens.c38c6"), t("agent.source.tag")]
               : [
                   t("ui.agent.5ce2e"),
                   t("ui.project.worktree.cbe27"),
@@ -564,30 +575,31 @@ function AgentTable({
                     {agentState(a.state)}
                   </span>,
                   a.pid ? (
-                    <>{formatPercent(a.cpu_percent || 0)} <TerminalBar percent={a.cpu_percent || 0} width={8}/></>
+                    numericCell(t("ui.cpu.ff221"),<>{formatPercent(a.cpu_percent || 0)} <TerminalBar percent={a.cpu_percent || 0} width={8}/></>,a.provenance?.resources)
                   ) : (
                     "Unknown"
                   ),
-                  a.pid ? formatBytes(a.rss_bytes || 0) : t("ui.unknown.bc781"),
+                  a.pid ? numericCell(t("ui.memory.89c8a"),formatBytes(a.rss_bytes || 0),a.provenance?.resources) : t("ui.unknown.bc781"),
                   tokens.has(a.id)
-                    ? formatTokens(tokens.get(a.id)!)
+                    ? numericCell(t("ui.tokens.c38c6"),formatTokens(tokens.get(a.id)!),a.provenance?.tokens)
                     : t("ui.unknown.bc781"),
+                  <a className="terminal-dim terminal-link" href={`/agents?session=${encodeURIComponent(a.id)}#session-detail`} title={t("agent.source.open_detail")}>{sessionSourceTag(a)}</a>,
                 ]
               : [
                   first,
                   `${sessionProject(a)} / ${a.worktree || t("value.unknown")}`,
                   <span className={a.state === "erroring" || a.state === "rate-limited" ? "attention" : ""}>{agentState(a.state)}</span>,
                   a.pid ? (
-                    <>{formatPercent(a.cpu_percent || 0)} <TerminalBar percent={a.cpu_percent || 0} width={8}/></>
+                    numericCell(t("ui.cpu.ff221"),<>{formatPercent(a.cpu_percent || 0)} <TerminalBar percent={a.cpu_percent || 0} width={8}/></>,a.provenance?.resources)
                   ) : (
                     "Unknown"
                   ),
-                  a.pid ? formatBytes(a.rss_bytes || 0) : t("ui.unknown.bc781"),
+                  a.pid ? numericCell(t("ui.memory.89c8a"),formatBytes(a.rss_bytes || 0),a.provenance?.resources) : t("ui.unknown.bc781"),
                   tokens.has(a.id)
-                    ? formatTokens(tokens.get(a.id)!)
+                    ? numericCell(t("ui.tokens.c38c6"),formatTokens(tokens.get(a.id)!),a.provenance?.tokens)
                     : t("ui.unknown.bc781"),
                   a.model || t("value.unknown_model"),
-                  <span className="terminal-dim">{sessionSourceTag(a)}</span>,
+                  <a className="terminal-dim terminal-link" href={`#session-detail`} title={t("agent.source.open_detail")} onClick={()=>choose(a.id)}>{sessionSourceTag(a)}</a>,
                 ];
           })}
         />
@@ -1774,7 +1786,7 @@ function App() {
             </div>
           ) : null}
           {view === "glossary" ? (
-            <div className="terminal-grid"><section className="terminal-box terminal-span-12" aria-label={t("terminal.glossary")}><h2>{t("terminal.glossary")}</h2><div className="terminal-box-body"><p>{t("terminal.glossary_intro")}</p><p>{t("terminal.glossary_bar")}</p><p>{t("terminal.glossary_unknown")}</p><p>{t("agent.glossary.otel")}</p><p>{t("agent.glossary.log")}</p><p>{t("agent.glossary.estimated")}</p><p className="terminal-warn">{t("terminal.glossary_warn")}</p><p className="terminal-crit">{t("terminal.glossary_crit")}</p></div></section></div>
+            <div className="terminal-grid"><section className="terminal-box terminal-span-12" aria-label={t("terminal.glossary")}><h2>{t("terminal.glossary")}</h2><div className="terminal-box-body"><p>{t("terminal.glossary_intro")}</p><p>{t("terminal.glossary_bar")}</p><p>{t("terminal.glossary_unknown")}</p><p>{t("agent.glossary.otel")}</p><p>{t("agent.glossary.log")}</p><p>{t("agent.glossary.proc")}</p><p>{t("agent.glossary.estimated")}</p><p className="terminal-warn">{t("terminal.glossary_warn")}</p><p className="terminal-crit">{t("terminal.glossary_crit")}</p></div></section></div>
           ) : view === "settings" ? (
             <SettingsView preferences={preferences} onChange={changePreferences} onReset={() => changePreferences(serverDefaults)} />
           ) : !host ? (

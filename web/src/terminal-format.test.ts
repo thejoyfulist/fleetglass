@@ -47,7 +47,7 @@ describe("session source labels", () => {
     expect(sessionSourceTag({source:"otlp",sources:["otlp","log","process"]})).toBe("otel+log");
     expect(sessionSourceTag({source:"process"})).toBe("proc");
     setLanguage("en");
-    expect(sessionSourceLegend()).toBe("otel = OpenTelemetry · log = local logs · ~ = estimated");
+    expect(sessionSourceLegend()).toBe("otel = OpenTelemetry · log = local logs · proc = process · est. = estimated");
     setLanguage("fr");
     expect(sessionSourceLegend()).toContain("journaux locaux");
     setLanguage("en");
