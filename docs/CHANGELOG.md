@@ -4,6 +4,10 @@ All notable user-facing changes are documented here. This project follows [Keep 
 
 ## [Unreleased]
 
+### Fixed
+
+- Possible-loop warnings now use the observed tracking window, require recent token output, and recognize changes in attributed worktrees from cached Git scans.
+
 ### Added
 
 - Per-session last file edit and last tool timestamps, a configurable possible-loop warning, and an edit-age column in the cockpit and read-only MCP output.

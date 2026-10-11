@@ -95,8 +95,8 @@ func TestMCPRunningIncludesPossibleLoopFlag(t *testing.T) {
 	defer s.Close()
 	now := time.Now().UTC()
 	id := strings.Repeat("a", 64)
-	session := model.AgentSession{ID: id, Kind: "codex", At: now, StartedAt: now.Add(-time.Hour), State: "working", Source: "otlp", LastTool: "Bash", LastToolAt: now, LastFileEditAt: now.Add(-27 * time.Minute)}
-	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{session}}}); err != nil {
+	session := model.AgentSession{ID: id, Kind: "codex", At: now, StartedAt: now.Add(-time.Hour), FirstToolAt: now.Add(-time.Hour), State: "working", Source: "otlp", LastTool: "Bash", LastToolAt: now, LastFileEditAt: now.Add(-27 * time.Minute)}
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{session}, Usage: []model.AIUsage{{ID: strings.Repeat("b", 64), Session: id, Kind: "codex", At: now, Source: "otlp", Tokens: model.Tokens{Output: 10}, OutputTokensPerSecond: 5, SpeedMethod: "otlp"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	data, why := New(s, "", "").mcpCall("what_is_running", "host", "", "", 0)

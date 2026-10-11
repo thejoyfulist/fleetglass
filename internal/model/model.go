@@ -45,6 +45,11 @@ type WorktreeEntry struct {
 	Name           string    `json:"name"`
 	Path           string    `json:"path"`
 	Branch         string    `json:"branch,omitempty"`
+	Head           string    `json:"head,omitempty"`
+	DirtyFiles     int       `json:"dirty_files"`
+	StatusComplete bool      `json:"status_complete"`
+	IndexMTime     time.Time `json:"index_mtime,omitzero"`
+	LastChangeAt   time.Time `json:"last_change_at,omitzero"`
 	SizeBytes      int64     `json:"size_bytes"`
 	SizeComplete   bool      `json:"size_complete"`
 	CreatedAt      time.Time `json:"created_at,omitempty"`
@@ -222,6 +227,7 @@ type AgentSession struct {
 	LastStatus           string          `json:"last_status,omitempty"`
 	LastTool             string          `json:"last_tool,omitempty"`
 	LastToolAt           time.Time       `json:"last_tool_at,omitzero"`
+	FirstToolAt          time.Time       `json:"first_tool_at,omitzero"`
 	LastUsageAt          time.Time       `json:"last_usage_at,omitzero"`
 	LastFileEditAt       time.Time       `json:"last_file_edit_at,omitzero"`
 	MinutesSinceFileEdit *int            `json:"minutes_since_file_edit,omitempty"`

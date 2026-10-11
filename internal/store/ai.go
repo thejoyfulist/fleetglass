@@ -43,6 +43,9 @@ func ingestAI(tx *sql.Tx, host string, data *model.AI) error {
 			continue
 		}
 		ai.NormalizeProvenance(&s)
+		if s.FirstToolAt.IsZero() && !s.LastToolAt.IsZero() {
+			s.FirstToolAt = time.Now().UTC()
+		}
 		if s.StartedAt.IsZero() {
 			s.StartedAt = s.At
 		}
@@ -271,13 +274,26 @@ func (s *Store) agentsAt(host string, now time.Time) ([]model.AgentSession, erro
 	if err != nil {
 		return nil, err
 	}
-	branches := make(map[string]string, len(trees.Worktrees))
+	byPath := make(map[string]model.WorktreeEntry, len(trees.Worktrees))
 	for _, tree := range trees.Worktrees {
-		branches[tree.Path] = tree.Branch
+		byPath[tree.Path] = tree
+		byPath[tree.Project+"/"+tree.Name] = tree
 	}
 	for i := range out {
-		if branch := branches[out[i].Worktree]; branch != "" {
-			out[i].Branch = branch
+		key := out[i].Worktree
+		if !filepath.IsAbs(key) {
+			key = out[i].Project + "/" + key
+		}
+		if tree, ok := byPath[key]; ok {
+			out[i].Branch = tree.Branch
+			observedSince := out[i].StartedAt
+			if out[i].FirstToolAt.After(observedSince) {
+				observedSince = out[i].FirstToolAt
+			}
+			if tree.LastChangeAt.After(out[i].LastFileEditAt) && !tree.LastChangeAt.Before(observedSince) {
+				out[i].LastFileEditAt = tree.LastChangeAt
+				out[i].Provenance.FileEdit = "repo"
+			}
 			out[i].Label = SessionLabel(out[i])
 		}
 	}

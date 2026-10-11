@@ -327,6 +327,7 @@ func (x *Receiver) metrics(resources []*metricspb.ResourceMetrics) {
 						s.LastTurnEnded = old.LastTurnEnded
 						s.LastTool = old.LastTool
 						s.LastToolAt = old.LastToolAt
+						s.FirstToolAt = old.FirstToolAt
 						s.LastFileEditAt = old.LastFileEditAt
 						s.Provenance.FileEdit = old.Provenance.FileEdit
 						s.Provenance.Tool = old.Provenance.Tool
@@ -426,6 +427,7 @@ func (x *Receiver) logs(resources []*logspb.ResourceLogs) {
 				s := model.AgentSession{ID: id, Kind: k, Model: safeTag(first(a, "model", "model_name")), At: at, StartedAt: at, State: state, Reason: reason, Source: "otlp", LastTurnEnded: ended, LastStatus: safeTag(status), LastTool: safeTag(first(a, "tool_name", "tool.name")), RequestDurationMS: requestDuration}
 				if s.LastTool != "" {
 					s.LastToolAt = at
+					s.FirstToolAt = time.Now().UTC()
 					s.Provenance.Tool = "otel"
 					if IsFileTool(s.LastTool) {
 						s.LastFileEditAt = at
@@ -433,6 +435,9 @@ func (x *Receiver) logs(resources []*logspb.ResourceLogs) {
 					}
 				}
 				if old, ok := x.sessions[id]; ok {
+					if !old.FirstToolAt.IsZero() && (s.FirstToolAt.IsZero() || old.FirstToolAt.Before(s.FirstToolAt)) {
+						s.FirstToolAt = old.FirstToolAt
+					}
 					if !old.StartedAt.IsZero() && old.StartedAt.Before(s.StartedAt) {
 						s.StartedAt = old.StartedAt
 					}

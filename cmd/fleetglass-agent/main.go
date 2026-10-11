@@ -347,7 +347,7 @@ func (a *agent) send(results []model.Result) {
 		default:
 		}
 	}
-	if !a.once && len(a.c.WorktreeRoots) > 0 && a.worktreePending == nil && (a.worktreeAt.IsZero() || now.Sub(a.worktreeAt) >= time.Hour) {
+	if !a.once && len(a.c.WorktreeRoots) > 0 && a.worktreePending == nil && (a.worktreeAt.IsZero() || now.Sub(a.worktreeAt) >= 5*time.Minute) {
 		a.worktreeAt = now
 		a.worktreePending = make(chan []model.WorktreeEntry, 1)
 		ch := a.worktreePending

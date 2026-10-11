@@ -37,16 +37,24 @@ func (s *Store) SessionDetail(host, id string, overrides map[string]model.AIPric
 		return out, err
 	}
 	if out.Session.Worktree != "" {
-		var treeRaw string
-		err := s.DB.QueryRow(`SELECT data FROM worktree_latest WHERE host_id=? AND path=? AND at_ns>=?`, host, out.Session.Worktree, time.Now().Add(-2*time.Hour).UnixNano()).Scan(&treeRaw)
-		if err != nil && err != sql.ErrNoRows {
+		trees, err := s.Worktrees(host, time.Now())
+		if err != nil {
 			return out, err
 		}
-		if err == nil {
-			var tree model.WorktreeEntry
-			if json.Unmarshal([]byte(treeRaw), &tree) == nil {
-				out.Session.Branch = tree.Branch
+		for _, tree := range trees.Worktrees {
+			if tree.Path != out.Session.Worktree && (tree.Project != out.Session.Project || tree.Name != out.Session.Worktree) {
+				continue
 			}
+			out.Session.Branch = tree.Branch
+			observedSince := out.Session.StartedAt
+			if out.Session.FirstToolAt.After(observedSince) {
+				observedSince = out.Session.FirstToolAt
+			}
+			if tree.LastChangeAt.After(out.Session.LastFileEditAt) && !tree.LastChangeAt.Before(observedSince) {
+				out.Session.LastFileEditAt = tree.LastChangeAt
+				out.Session.Provenance.FileEdit = "repo"
+			}
+			break
 		}
 	}
 	ai.NormalizeProvenance(&out.Session)
@@ -65,6 +73,14 @@ func (s *Store) SessionDetail(host, id string, overrides map[string]model.AIPric
 		var usage model.AIUsage
 		if json.Unmarshal([]byte(data), &usage) != nil {
 			continue
+		}
+		if usage.At.After(out.Session.LastUsageAt) {
+			out.Session.LastUsageAt = usage.At
+			if usage.OutputTokensPerSecond > 0 {
+				rate := usage.OutputTokensPerSecond
+				out.Session.SpeedTokensPerSecond = &rate
+				out.Session.SpeedMethod = usage.SpeedMethod
+			}
 		}
 		out.TokensBySource[usage.Source] = addTokens(out.TokensBySource[usage.Source], usage.Tokens)
 		if !containsSessionSource(out.Session.Sources, usage.Source) {

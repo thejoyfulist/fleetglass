@@ -263,14 +263,17 @@ func (r *LogReader) Scan(now time.Time) model.AI {
 					}
 					next := model.AgentSession{ID: session, Kind: root.Kind, Model: modelName, Project: project, Worktree: r.fileWorktree[path], At: at, StartedAt: started, State: "working", Reason: "recent log activity", Source: "log", LastTurnEnded: ended}
 					if old, ok := sessions[session]; ok {
-						next.LastTool, next.LastToolAt, next.LastFileEditAt, next.Provenance = old.LastTool, old.LastToolAt, old.LastFileEditAt, old.Provenance
+						next.LastTool, next.LastToolAt, next.FirstToolAt, next.LastFileEditAt, next.Provenance = old.LastTool, old.LastToolAt, old.FirstToolAt, old.LastFileEditAt, old.Provenance
 					} else if old, ok := r.latestSessions[session]; ok {
-						next.LastTool, next.LastToolAt, next.LastFileEditAt, next.Provenance = old.LastTool, old.LastToolAt, old.LastFileEditAt, old.Provenance
+						next.LastTool, next.LastToolAt, next.FirstToolAt, next.LastFileEditAt, next.Provenance = old.LastTool, old.LastToolAt, old.FirstToolAt, old.LastFileEditAt, old.Provenance
 					}
 					sessions[session] = next
 				}
 				for _, tool := range logToolNames(root.Kind, event) {
 					current := sessions[session]
+					if current.FirstToolAt.IsZero() {
+						current.FirstToolAt = now
+					}
 					if !at.Before(current.LastToolAt) {
 						current.LastTool = safeTag(tool)
 						current.LastToolAt = at

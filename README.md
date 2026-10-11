@@ -19,7 +19,7 @@
 ## Why Fleetglass
 
 - See which agent session and project is using CPU and memory, alongside token pace, model cost estimates, and subscription quotas.
-- Spot active sessions with no observed file-changing tool call for the configured interval; a cyan "loop?" flag suggests review.
+- Spot active sessions with no observed file change for the configured interval; a cyan "loop?" flag suggests review.
 - Know where every number comes from: each session metric is tagged OpenTelemetry, local logs, process or estimated.
 - Check machine health, services, containers, projects, probes, and recent changes on one screen.
 - Keep observations private: loopback listeners by default, local storage, and read-only host access.
@@ -150,7 +150,7 @@ Alert delivery and incident workflows (ntfy, Telegram, email), then broader agen
 
 ## FAQ
 
-**Can it tell if an agent is stuck?** It can flag an active session that has not reported a file-changing tool call for 20 minutes by default. This is a hint, not proof of a loop: shell edits and missing tool telemetry remain unknown. [Activity rule and supported tools](docs/AI-AGENTS.md#file-edit-activity).
+**Can it tell if an agent is stuck?** It can flag an active session with recent token output and no observed file change for 20 minutes by default. The interval starts when tool tracking begins for an already running session. Configured worktree scans can detect some shell edits through Git state changes; other shell edits and missing telemetry remain unknown. This is a hint, not proof of a loop. [Activity rule and supported tools](docs/AI-AGENTS.md#file-edit-activity).
 
 **Does it send data?** No product telemetry is sent to the maintainers. Agents send measurements to the Fleetglass server you configure; optional update checks are off by default.
 

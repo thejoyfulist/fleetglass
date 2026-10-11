@@ -43,4 +43,14 @@ func TestScanWorktreesReportsMergedIdleSize(t *testing.T) {
 	if len(items) != 1 || items[0].Branch != "feature" || items[0].Merged == nil || !*items[0].Merged || !items[0].Reclaimable || !items[0].SizeComplete || items[0].SizeBytes < 7 || items[0].LastCommitAt.IsZero() {
 		t.Fatalf("worktree inventory: %+v", items)
 	}
+	if items[0].Head == "" || items[0].DirtyFiles != 0 || items[0].IndexMTime.IsZero() {
+		t.Fatalf("missing repository baseline: %+v", items[0])
+	}
+	if err := os.WriteFile(filepath.Join(tree, "readme.txt"), []byte("changed"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	changed := ScanWorktrees(ctx, []string{root}, nil, nil)
+	if len(changed) != 1 || changed[0].DirtyFiles != 1 {
+		t.Fatalf("dirty file not counted: %+v", changed)
+	}
 }

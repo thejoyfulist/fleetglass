@@ -13,8 +13,26 @@ import (
 
 func ingestWorktrees(tx *sql.Tx, batch model.Batch) error {
 	for _, tree := range batch.Worktrees {
-		if !filepath.IsAbs(tree.Root) || filepath.Clean(tree.Root) != tree.Root || tree.Project == "" || tree.Name == "" || strings.Contains(tree.Project, "/") || strings.Contains(tree.Name, "/") || tree.Path != filepath.Join(tree.Root, tree.Project, tree.Name) || tree.SizeBytes < 0 || tree.AgentProcesses < 0 || tree.Processes < 0 || tree.AgentProcesses > tree.Processes {
+		if !filepath.IsAbs(tree.Root) || filepath.Clean(tree.Root) != tree.Root || tree.Project == "" || tree.Name == "" || strings.Contains(tree.Project, "/") || strings.Contains(tree.Name, "/") || tree.Path != filepath.Join(tree.Root, tree.Project, tree.Name) || tree.SizeBytes < 0 || tree.DirtyFiles < 0 || tree.AgentProcesses < 0 || tree.Processes < 0 || tree.AgentProcesses > tree.Processes {
 			return errors.New("invalid worktree")
+		}
+		var oldRaw string
+		var oldAt int64
+		err := tx.QueryRow(`SELECT at_ns,data FROM worktree_latest WHERE host_id=? AND path=?`, batch.HostID, tree.Path).Scan(&oldAt, &oldRaw)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+		if oldAt > batch.At.UnixNano() {
+			continue
+		}
+		if err == nil {
+			var old model.WorktreeEntry
+			if json.Unmarshal([]byte(oldRaw), &old) == nil {
+				tree.LastChangeAt = old.LastChangeAt
+				if old.Head != "" && tree.Head != "" && old.Head != tree.Head || old.StatusComplete && tree.StatusComplete && old.DirtyFiles != tree.DirtyFiles || !old.IndexMTime.IsZero() && !tree.IndexMTime.IsZero() && !old.IndexMTime.Equal(tree.IndexMTime) {
+					tree.LastChangeAt = batch.At
+				}
+			}
 		}
 		data, err := json.Marshal(tree)
 		if err != nil {

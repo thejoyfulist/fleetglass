@@ -24,7 +24,7 @@ func TestAIEndpointsAndSSEOverview(t *testing.T) {
 	h := a.Handler()
 	id := strings.Repeat("a", 64)
 	now := time.Now().UTC()
-	batch := model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{{ID: id, Kind: "claude", Project: "demo", At: now, StartedAt: now.Add(-time.Hour), LastFileEditAt: now.Add(-27 * time.Minute), LastToolAt: now, LastTool: "Bash", State: "working", Reason: "recent activity", Source: "otlp"}}, Usage: []model.AIUsage{{ID: strings.Repeat("b", 64), Session: id, Kind: "claude", Project: "demo", Model: "claude-sonnet-5", At: now, Source: "otlp", Tokens: model.Tokens{Input: 100}}}, Quotas: []model.Quota{{Kind: "codex", Window: "primary", Used: 50, ObservedAt: now, ResetsAt: now.Add(time.Hour), Method: "cli_reported"}}}}
+	batch := model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{{ID: id, Kind: "claude", Project: "demo", At: now, StartedAt: now.Add(-time.Hour), FirstToolAt: now.Add(-time.Hour), LastFileEditAt: now.Add(-27 * time.Minute), LastToolAt: now, LastTool: "Bash", State: "working", Reason: "recent activity", Source: "otlp"}}, Usage: []model.AIUsage{{ID: strings.Repeat("b", 64), Session: id, Kind: "claude", Project: "demo", Model: "claude-sonnet-5", At: now, Source: "otlp", Tokens: model.Tokens{Input: 100}, OutputTokensPerSecond: 12, SpeedMethod: "otlp"}}, Quotas: []model.Quota{{Kind: "codex", Window: "primary", Used: 50, ObservedAt: now, ResetsAt: now.Add(time.Hour), Method: "cli_reported"}}}}
 	b, _ := json.Marshal(batch)
 	r := httptest.NewRequest("POST", "/api/v1/ingest", bytes.NewReader(b))
 	r.Header.Set("Authorization", "Bearer secret")

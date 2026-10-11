@@ -178,6 +178,9 @@ func MergeSessions(sessions []model.AgentSession) []model.AgentSession {
 			preferred.LastTool = other.LastTool
 			preferred.Provenance.Tool = other.Provenance.Tool
 		}
+		if !other.FirstToolAt.IsZero() && (preferred.FirstToolAt.IsZero() || other.FirstToolAt.Before(preferred.FirstToolAt)) {
+			preferred.FirstToolAt = other.FirstToolAt
+		}
 		if other.LastFileEditAt.After(preferred.LastFileEditAt) {
 			preferred.LastFileEditAt = other.LastFileEditAt
 			preferred.Provenance.FileEdit = other.Provenance.FileEdit

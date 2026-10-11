@@ -115,7 +115,7 @@ func TestOTLPFileToolTimestamps(t *testing.T) {
 	l := &logspb.ResourceLogs{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{TimeUnixNano: now, EventName: "codex.tool_result", Attributes: attrs}}}}}
 	sendOTLP(t, x.Handler(""), "/v1/logs", "resourceLogs", l, false, false)
 	got := x.Drain()
-	if len(got.Sessions) != 1 || got.Sessions[0].LastFileEditAt.IsZero() || got.Sessions[0].LastToolAt.IsZero() || got.Sessions[0].Provenance.FileEdit != "otel" {
+	if len(got.Sessions) != 1 || got.Sessions[0].LastFileEditAt.IsZero() || got.Sessions[0].LastToolAt.IsZero() || got.Sessions[0].FirstToolAt.IsZero() || got.Sessions[0].Provenance.FileEdit != "otel" {
 		t.Fatalf("%+v", got.Sessions)
 	}
 }

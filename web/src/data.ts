@@ -24,6 +24,7 @@ export interface Session {
   speed_method?: string;
   last_file_edit_at?: string;
   last_tool_at?: string;
+  first_tool_at?: string;
   last_tool?: string;
   minutes_since_file_edit?: number;
   activity?: string;

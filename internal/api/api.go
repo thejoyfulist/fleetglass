@@ -59,16 +59,27 @@ func writeJSON(w http.ResponseWriter, v any) {
 }
 func loopDetail(s model.AgentSession) string {
 	minutes := noEditMinutes(s)
-	if s.SpeedTokensPerSecond != nil && *s.SpeedTokensPerSecond > 0 && !s.LastUsageAt.IsZero() && time.Since(s.LastUsageAt) <= 2*time.Minute {
-		return fmt.Sprintf("%s generating ~%.1f tok/s, no file edit for %d min - possibly looping", s.Label, *s.SpeedTokensPerSecond, minutes)
+	window := fmt.Sprintf("no file edit for %d min", minutes)
+	if (s.LastFileEditAt.IsZero() || s.FirstToolAt.After(s.LastFileEditAt)) && s.FirstToolAt.After(s.StartedAt) {
+		window = fmt.Sprintf("no file changes since tracking began %d min ago", minutes)
 	}
-	return fmt.Sprintf("%s active, no file edit for %d min - possibly looping", s.Label, minutes)
+	if s.Worktree == "" {
+		window += "; file changes via shell are not visible without a worktree"
+	}
+	if s.SpeedTokensPerSecond != nil && *s.SpeedTokensPerSecond > 0 && !s.LastUsageAt.IsZero() && time.Since(s.LastUsageAt) <= 2*time.Minute {
+		return fmt.Sprintf("%s generating ~%.1f tok/s, %s - possibly looping", s.Label, *s.SpeedTokensPerSecond, window)
+	}
+	return fmt.Sprintf("%s active, %s - possibly looping", s.Label, window)
 }
 func noEditMinutes(s model.AgentSession) int {
 	if s.MinutesSinceFileEdit != nil {
 		return *s.MinutesSinceFileEdit
 	}
-	return max(0, int(time.Since(s.StartedAt).Minutes()))
+	base := s.StartedAt
+	if s.FirstToolAt.After(base) {
+		base = s.FirstToolAt
+	}
+	return max(0, int(time.Since(base).Minutes()))
 }
 func readTokenMatches(got, expected string) bool {
 	a, b := sha256.Sum256([]byte(got)), sha256.Sum256([]byte(expected))
@@ -147,6 +158,9 @@ func (a *API) Handler() http.Handler {
 					since := session.LastFileEditAt
 					if since.IsZero() {
 						since = session.StartedAt
+					}
+					if session.FirstToolAt.After(since) {
+						since = session.FirstToolAt
 					}
 					v.Insights = append(v.Insights, store.Insight{Kind: "agent_loop", App: session.Label, Detail: loopDetail(session), Since: since})
 				}

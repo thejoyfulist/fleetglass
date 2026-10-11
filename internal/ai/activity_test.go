@@ -32,8 +32,12 @@ func TestAssessActivity(t *testing.T) {
 		flag    bool
 	}{
 		{"editing", model.AgentSession{State: "working", At: now, StartedAt: now.Add(-time.Hour), LastToolAt: now, LastFileEditAt: now.Add(-19 * time.Minute)}, "editing", false},
-		{"threshold", model.AgentSession{State: "working", At: now, StartedAt: now.Add(-time.Hour), LastToolAt: now, LastFileEditAt: now.Add(-20 * time.Minute), SpeedTokensPerSecond: &rate}, "working, no file changes for 20m (possibly looping)", true},
-		{"no edit ever", model.AgentSession{State: "working", At: now, StartedAt: now.Add(-27 * time.Minute), LastToolAt: now}, "working, no file changes for 27m (possibly looping)", true},
+		{"real loop at threshold", model.AgentSession{State: "working", At: now, StartedAt: now.Add(-time.Hour), LastToolAt: now, LastUsageAt: now, LastFileEditAt: now.Add(-20 * time.Minute), SpeedTokensPerSecond: &rate}, "working, no file changes for 20m (possibly looping)", true},
+		{"fresh tracking of old session", model.AgentSession{State: "working", At: now, StartedAt: now.Add(-29 * time.Hour), FirstToolAt: now.Add(-2 * time.Minute), LastToolAt: now, LastUsageAt: now, SpeedTokensPerSecond: &rate}, "working, no file changes since tracking began 2m ago", false},
+		{"historical edit before tracking", model.AgentSession{State: "working", At: now, StartedAt: now.Add(-29 * time.Hour), FirstToolAt: now.Add(-2 * time.Minute), LastToolAt: now, LastUsageAt: now, LastFileEditAt: now.Add(-time.Hour), SpeedTokensPerSecond: &rate}, "working, no file changes since tracking began 2m ago", false},
+		{"shell without worktree or tokens", model.AgentSession{State: "working", At: now, StartedAt: now.Add(-27 * time.Minute), FirstToolAt: now.Add(-27 * time.Minute), LastToolAt: now}, "working", false},
+		{"shell without worktree but tokens", model.AgentSession{State: "working", At: now, StartedAt: now.Add(-27 * time.Minute), FirstToolAt: now.Add(-27 * time.Minute), LastToolAt: now, LastUsageAt: now, SpeedTokensPerSecond: &rate}, "working, no file changes for 27m (possibly looping)", true},
+		{"repo change from shell", model.AgentSession{State: "working", At: now, StartedAt: now.Add(-time.Hour), Worktree: "tree", FirstToolAt: now.Add(-time.Hour), LastToolAt: now, LastUsageAt: now, LastFileEditAt: now.Add(-time.Minute), SpeedTokensPerSecond: &rate, Provenance: model.AgentProvenance{FileEdit: "repo"}}, "editing", false},
 		{"idle", model.AgentSession{State: "idle", At: now, StartedAt: now.Add(-time.Hour), LastToolAt: now.Add(-time.Minute), LastFileEditAt: now.Add(-30 * time.Minute)}, "idle", false},
 		{"unknown", model.AgentSession{State: "working", At: now, StartedAt: now.Add(-time.Hour)}, "unknown", false},
 	}
@@ -75,7 +79,7 @@ func TestLogReaderRecordsToolTimestamps(t *testing.T) {
 				t.Fatal(err)
 			}
 			got := NewLogReader([]Root{{Kind: tc.kind, Path: root}}).Scan(now.Add(time.Second))
-			if len(got.Sessions) != 1 || got.Sessions[0].LastTool != tc.tool || got.Sessions[0].LastFileEditAt.IsZero() || got.Sessions[0].Provenance.FileEdit != "log" {
+			if len(got.Sessions) != 1 || got.Sessions[0].LastTool != tc.tool || got.Sessions[0].LastFileEditAt.IsZero() || got.Sessions[0].Provenance.FileEdit != "log" || !got.Sessions[0].FirstToolAt.Equal(now.Add(time.Second)) {
 				t.Fatalf("%+v", got.Sessions)
 			}
 		})
