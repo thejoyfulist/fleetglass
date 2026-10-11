@@ -38,7 +38,7 @@ func TestInactiveLogSessionReachesServerAsEnded(t *testing.T) {
 	defer s.Close()
 	server := httptest.NewServer(api.New(s, "test-token", "fixture-host").Handler())
 	defer server.Close()
-	a := &agent{c: config.Config{HostID: "fixture-host", ServerURL: server.URL, Token: "test-token", ProcRoot: filepath.Join(root, "proc"), HelperSocket: filepath.Join(root, "missing.sock")}, client: server.Client(), receiver: ai.NewReceiver(), logs: ai.NewLogReader([]ai.Root{{Kind: "claude", Path: logRoot}})}
+	a := &agent{c: config.Config{HostID: "fixture-host", ServerURL: server.URL, Token: fixture("test-token"), ProcRoot: filepath.Join(root, "proc"), HelperSocket: filepath.Join(root, "missing.sock")}, client: server.Client(), receiver: ai.NewReceiver(), logs: ai.NewLogReader([]ai.Root{{Kind: "claude", Path: logRoot}})}
 	a.send(nil)
 	resp, err := server.Client().Get(server.URL + "/api/v1/hosts/fixture-host/agents")
 	if err != nil {

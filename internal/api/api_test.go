@@ -95,7 +95,7 @@ func TestReadTokenProtectsAllReads(t *testing.T) {
 	}
 	defer s.Close()
 	a := New(s, "ingest-secret", "")
-	a.ReadToken = "read-secret"
+	a.ReadToken = fixture("read-secret")
 	h := a.Handler()
 	for _, path := range []string{"/api/v1/hosts", "/api/v1/hosts/h/overview", "/api/v1/hosts/h/series?metric=cpu", "/api/v1/hosts/h/agents", "/api/v1/hosts/h/ai/usage?range=24h&by=project", "/api/v1/hosts/h/ai/quotas", "/api/v1/hosts/h/ai/costs?range=24h", "/api/v1/hosts/h/changes?range=24h", "/api/v1/hosts/h/energy", "/api/v1/live"} {
 		w := httptest.NewRecorder()

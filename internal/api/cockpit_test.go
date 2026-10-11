@@ -56,7 +56,7 @@ func TestEmbeddedCockpit(t *testing.T) {
 }
 func TestReadSessionFlow(t *testing.T) {
 	a := cockpitAPI(t)
-	a.ReadToken = "read-token"
+	a.ReadToken = fixture("read-token")
 	h := a.Handler()
 	req := func(method, path string, body []byte, c *http.Cookie) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, path, bytes.NewReader(body))
@@ -120,7 +120,7 @@ func TestLoopbackReadsStayOpen(t *testing.T) {
 }
 func TestSecureSessionBehindHTTPS(t *testing.T) {
 	a := cockpitAPI(t)
-	a.ReadToken = "read-token"
+	a.ReadToken = fixture("read-token")
 	r := httptest.NewRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"read-token"}`))
 	r.Header.Set("X-Forwarded-Proto", "https")
 	w := httptest.NewRecorder()
@@ -132,7 +132,7 @@ func TestSecureSessionBehindHTTPS(t *testing.T) {
 
 func TestSignInRateLimitByAddress(t *testing.T) {
 	a := cockpitAPI(t)
-	a.ReadToken = "read-token"
+	a.ReadToken = fixture("read-token")
 	h := a.Handler()
 	for i := 0; i < maxLoginAttempts+1; i++ {
 		r := httptest.NewRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"wrong"}`))
@@ -168,7 +168,7 @@ func TestSignInRateLimitByAddress(t *testing.T) {
 
 func TestSessionCapacityEvictsOldest(t *testing.T) {
 	a := cockpitAPI(t)
-	a.ReadToken = "read-token"
+	a.ReadToken = fixture("read-token")
 	h := a.Handler()
 	a.mu.Lock()
 	for i := 0; i < maxSessions; i++ {

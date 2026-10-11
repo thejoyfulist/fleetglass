@@ -21,7 +21,7 @@ func TestMetricsUsesReadAuthenticationAndEscapesLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := New(s, "ingest", "host")
-	a.ReadToken = "read-secret"
+	a.ReadToken = fixture("read-secret")
 	h := a.Handler()
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, httptest.NewRequest("GET", "/metrics", nil))

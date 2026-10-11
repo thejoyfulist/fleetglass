@@ -24,7 +24,7 @@ func TestPublicStatusHasNoPrivateFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := New(s, "secret", "")
-	a.ReadToken = "read-secret"
+	a.ReadToken = fixture("read-secret")
 	for _, h := range []struct {
 		name    string
 		handler interface {
