@@ -30,7 +30,13 @@ Linux amd64/arm64 with systemd. Review [the installer](install.sh) before runnin
 curl -fsSL https://raw.githubusercontent.com/thejoyfulist/fleetglass/main/install.sh | sudo sh
 ```
 
-Preview the actions with `curl -fsSL https://raw.githubusercontent.com/thejoyfulist/fleetglass/main/install.sh | sudo sh -s -- --dry-run`. To pin a release, set `FLEETGLASS_VERSION=vX.Y.Z` in the root environment; see [install and upgrade](docs/INSTALL.md).
+Preview the actions with `curl -fsSL https://raw.githubusercontent.com/thejoyfulist/fleetglass/main/install.sh | sudo sh -s -- --dry-run`. To pin a release, pass the version to `sudo`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/thejoyfulist/fleetglass/main/install.sh | sudo FLEETGLASS_VERSION=v0.9.0 sh
+```
+
+See [install and upgrade](docs/INSTALL.md).
 
 <details><summary>Manual verified install</summary>
 
@@ -81,13 +87,18 @@ See [agent setup](docs/AI-AGENTS.md) for attribution, local log fallback, and qu
 
 ## Features
 
-| View | What it shows | Synthetic preview |
-| --- | --- | --- |
-| Agents | Sessions, token speed, cost by model and project, quotas with pace | <img src="assets/screenshots/agents-dark.png" width="220" alt="Synthetic agents view"> |
-| Server | CPU, temperature, storage, energy, network | <img src="assets/screenshots/overview-dark.png" width="220" alt="Synthetic server overview"> |
-| Services & uptime | systemd, containers, probes, TLS | <img src="assets/screenshots/overview-dark.png" width="220" alt="Synthetic server overview"> |
-| Projects | Development servers, ports, worktrees, idle processes | <img src="assets/screenshots/projects-dark.png" width="220" alt="Synthetic projects view"> |
-| Changes & security | Updates, journal errors, backups, recent changes | <img src="assets/screenshots/overview-dark.png" width="220" alt="Synthetic server overview"> |
+| View | What it shows |
+| --- | --- |
+| Agents | Sessions, token speed, cost by model and project, quotas with pace |
+| Server | CPU, temperature, storage, energy, network |
+| Services & uptime | systemd, containers, probes, TLS |
+| Projects | Development servers, ports, worktrees, idle processes |
+| Changes & security | Updates, journal errors, backups, recent changes |
+
+<table>
+  <tr><td><a href="assets/screenshots/overview-dark.png"><img src="assets/screenshots/overview-dark.png" width="420" alt="Synthetic dark overview"></a></td><td><a href="assets/screenshots/agents-dark.png"><img src="assets/screenshots/agents-dark.png" width="420" alt="Synthetic dark agents view"></a></td></tr>
+  <tr><td><a href="assets/screenshots/apps-dark.png"><img src="assets/screenshots/apps-dark.png" width="420" alt="Synthetic dark apps view"></a></td><td><a href="assets/screenshots/projects-dark.png"><img src="assets/screenshots/projects-dark.png" width="420" alt="Synthetic dark projects view"></a></td></tr>
+</table>
 
 Keyboard shortcuts: `1`–`9` views, `r` range, `/` search, `t` theme. The cockpit has light and dark themes and a mobile layout. [See the full screenshot set](assets/screenshots/).
 

@@ -21,7 +21,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix="fleetglass-demo-") as tmp:
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch(headless=True)
-                page = browser.new_page(viewport={"width": 1280, "height": 800}, device_scale_factor=1)
+                page = browser.new_page(viewport={"width": 1440, "height": 900}, device_scale_factor=1)
                 page.add_init_script("window.localStorage.setItem('fg-theme','dark');window.EventSource=class {constructor(){setTimeout(()=>this.onopen?.(),20)} addEventListener(){} close(){}};")
                 page.goto(f"http://127.0.0.1:{server.server_port}/", wait_until="networkidle")
                 page.locator("main").wait_for()
@@ -45,7 +45,7 @@ def main():
                             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "30", "-movflags", "+faststart",
                             str(OUT / "demo.mp4")], check=True)
             subprocess.run(["/usr/bin/ffmpeg", "-v", "error", "-y", "-framerate", str(FPS), "-i", source,
-                            "-filter_complex", "[0:v]split[a][b];[a]palettegen=max_colors=48:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
+                            "-filter_complex", "[0:v]split[a][b];[a]palettegen=max_colors=256:reserve_transparent=0:stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
                             "-loop", "0", str(OUT / "demo.gif")], check=True)
     finally:
         server.shutdown()

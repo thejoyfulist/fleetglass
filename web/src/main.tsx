@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { AreaChart, Bars, Gauge, ResponseChart, Ring, Sparkline } from "./charts";
+import { AreaChart, Bars, ResponseChart, Ring, Sparkline } from "./charts";
 import {
   availableTiles,
   changeDetail,
@@ -33,7 +33,6 @@ import {
   mountName,
   observationName,
   pace,
-  quotaLabel,
   quotaMethod,
   quotaWindow,
   resetTime,
@@ -543,7 +542,8 @@ function AgentTable({
                   t("ui.cpu.by.process.f62e5"),
                   t("ui.memory.by.process.d76ce"),
                   t("ui.tokens.c38c6"),
-                  t("ui.model.source.3a815"),
+                  t("terminal.label_model"),
+                  t("terminal.label_source"),
                 ]
           }
           rows={agents.map((a) => {
@@ -582,7 +582,8 @@ function AgentTable({
                   tokens.has(a.id)
                     ? formatTokens(tokens.get(a.id)!)
                     : t("ui.unknown.bc781"),
-                  `${a.model || t("value.unknown_model")} · ${agentSource(a.source)}`,
+                  a.model || t("value.unknown_model"),
+                  agentSource(a.source),
                 ];
           })}
         />
@@ -595,53 +596,12 @@ function AgentTable({
 function Quotas({ quotas, subscriptions }: { quotas: Quota[]; subscriptions: SubscriptionComparison[] }) {
   const missing = subscriptions.filter(s => (s.subscription_amount != null || s.subscription_usd !== null) && !quotas.some(q => q.kind === s.kind));
   if (!quotas.length && !missing.length) return <Empty>{t("ui.no.quota.observations.reported.42bea")}</Empty>;
-  const windowMinutes=(x:Quota)=>x.window_minutes||((x.window==="week"||x.window==="secondary")?10080:300);
-  const q = quotas[0];
-  return (
-    <div className="qwrap">
-      {q?<Gauge
-        used={q.used_percent}
-        paceValue={pace(q)}
-        label={`${agentName(q.kind)}, ${quotaWindow(q.window, q.window_minutes)}`}
-      />:null}
-      <div className="qlist">
-        {quotas.length?<p className="quota-advice">{["codex","claude"].map(kind=>quotas.filter(x=>x.kind===kind).sort((a,b)=>windowMinutes(b)-windowMinutes(a))[0]).filter((x):x is Quota=>Boolean(x)).map(x=>hasDate(x.projected_at)?t(x.used_percent>pace(x)+5?"quota.advice_ahead":"quota.room",{agent:agentName(x.kind),window:quotaWindow(x.window,x.window_minutes),used:formatQuotaPercent(x.used_percent),projected:resetTime(x.projected_at)}):t("quota.no_projection",{agent:agentName(x.kind),window:quotaWindow(x.window,x.window_minutes),used:formatQuotaPercent(x.used_percent),pace:quotaLabel(x)})).join(" · ")}</p>:null}
-        {quotas.map((x) => {
-          const paceValue = pace(x);
-          return (
-            <div className="qi" key={x.kind + x.window}>
-              <div className="row">
-                <span>
-                  {agentName(x.kind)}, {quotaWindow(x.window, x.window_minutes)}
-                </span>
-                <b>{formatQuotaPercent(x.used_percent)}</b>
-              </div>
-              <div className="bar">
-                <i
-                  className={x.used_percent > paceValue + 5 ? "att" : ""}
-                  style={{
-                    width: `${Math.min(100, Math.round(x.used_percent))}%`,
-                  }}
-                />
-                <s style={{ left: `${paceValue}%` }} />
-              </div>
-              <small>
-                <b
-                  className={x.used_percent > paceValue + 5 ? "attention" : ""}
-                >
-                  {quotaLabel(x)}
-                </b>{" "}
-                {" "}{t("ui.resets.5de1b")}{" "}{resetTime(x.resets_at)} ·{" "}
-                {quotaMethod(x.method, x.kind)}
-              </small>
-            </div>
-          );
-        })}
-        {missing.map(s=><div className="qi terminal-dim" key={s.kind}>{t("quota.not_reported",{plan:agentName(s.kind)})}</div>)}
-        {missing.some(s=>s.kind==="claude")?<p className="quota-hint terminal-dim">{t("quota.claude_hint")}</p>:null}
-      </div>
-    </div>
-  );
+  const reset = (at:string) => hasDate(at) ? formatDateTime(at) : "—";
+  const rows = [
+    ...quotas.map(q=>[agentName(q.kind),quotaWindow(q.window,q.window_minutes),formatQuotaPercent(q.used_percent),<TerminalBar percent={q.used_percent} width={12} pace={pace(q)}/>,reset(q.resets_at),quotaMethod(q.method,q.kind)]),
+    ...missing.map(s=>[<span className="terminal-dim">{agentName(s.kind)}</span>,"—","—","—","—",<span className="terminal-dim">{t("quota.not_reported",{plan:agentName(s.kind)})}</span>]),
+  ];
+  return <><TerminalTable heads={[t("terminal.label_plan"),t("terminal.label_window"),t("terminal.label_used"),t("terminal.pace"),t("terminal.label_reset"),t("terminal.label_source")]} right={[2,4]} rows={rows}/>{missing.some(s=>s.kind==="claude")?<p className="quota-hint terminal-dim">{t("quota.claude_hint")}</p>:null}</>;
 }
 function SpeedPanel({speed,host,session}: {speed:SpeedSummary[];host?:string;session?:string}) {
   const [window,setWindow] = useState<"1h"|"24h">("1h");
@@ -1772,7 +1732,7 @@ function App() {
       <header className="top">
         <div className="terminal-status"><MonoMark/><b>fleetglass {displayVersion}</b><span className="terminal-separator">│</span><span className="host"><TerminalFilter label={t("ui.host.3960e")} choices={hosts.map(h=>h.host_id)} value={host} onChange={setHost}/></span><span className="terminal-separator">│</span><span>{t("terminal.status_up")} {value(result(data.overview?.results||[],"host"),"uptime_seconds")===null?t("terminal.not_collected"):(()=>{const minutes=Math.floor(value(result(data.overview?.results||[],"host"),"uptime_seconds")!/60);return `${Math.floor(minutes/1440)}d ${String(Math.floor(minutes%1440/60)).padStart(2,"0")}:${String(minutes%60).padStart(2,"0")}`})()}</span><span className="terminal-separator">│</span><span>{t("terminal.status_kernel")} {result(data.overview?.results||[],"host")?.fields?.kernel_release?`Linux ${result(data.overview?.results||[],"host")?.fields?.kernel_release} ${result(data.overview?.results||[],"host")?.fields?.arch??""}`:t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{t("terminal.status_load")} {value(result(data.overview?.results||[],"load"),"1m")?.toFixed(2) ?? t("terminal.not_collected")}</span><span className="terminal-separator">│</span><span>{value(result(data.overview?.results||[],"cpu"),"core_count") ?? "—"} {t("terminal.label_threads")} · {value(result(data.overview?.results||[],"memory"),"total_bytes")===null?t("terminal.not_collected"):formatBytes(value(result(data.overview?.results||[],"memory"),"total_bytes"))}</span><span className="terminal-separator">│</span><span className="terminal-warn-count">{data.overview?.results.filter(x=>x.state==="warn").length ?? 0} WARN</span><span className="terminal-crit-count">{data.overview?.results.filter(x=>x.state==="crit").length ?? 0} CRIT</span><span>{data.stream === "stale" ? t("ui.connection.lost.62583") : stale ? t("ui.stale.data.2e635") : data.stream === "connecting" ? t("ui.connecting.c1f3b") : t("ui.live.65c82")}</span><span className="terminal-time">{new Date(tick).toLocaleString(preferences.language === "fr" ? "fr-FR" : "sv-SE",{dateStyle:"short",timeStyle:"medium",hour12:false})}</span>{protectedServer?<button type="button" className="quiet" onClick={signOut}>{t("ui.sign.out.dc164")}</button>:null}</div>
       </header>
-      <div className="terminal-tabs"><nav className="tabs" aria-label={t("ui.views.24be6")}>{terminalViews.filter(v=>!preferences.hiddenTabs.includes(v)).map(v=>{const index=terminalViews.indexOf(v);return <button type="button" key={v} aria-pressed={view===v||(v==="machine"&&view==="storage")} onClick={()=>go(v)}>{index===9?0:index+1} {t(navigationLabels[v as keyof typeof navigationLabels], preferences.language).toLowerCase()}</button>})}<button type="button" className="terminal-search" onClick={()=>setPalette(true)} aria-label={t("ui.search.or.jump.to.commands.control.or.command.k.26860")} title={t("ui.search.or.jump.to.commands.ctrl.k.50228")}>{t("ui.k.64d86")}</button>{hosts.length>1?<button type="button" onClick={()=>go("fleet")}>{formatNumber(fleet.filter(h=>h.liveness==="live").length)} {t("ui.of.de04f")} {formatNumber(fleet.length)} {t("ui.hosts.reporting.57618")} · {formatNumber(fleet.filter(h=>h.liveness!=="live").length)} {t("ui.need.attention.c8806")} · {t("ui.view.fleet.8d8a0")}</button>:null}<button type="button" aria-pressed={view==="settings"} onClick={()=>go("settings")}>{t("ui.settings.c7f73",preferences.language).toLowerCase()}</button><button type="button" aria-pressed={view==="glossary"} onClick={()=>go("glossary")}>{t("terminal.glossary")}</button></nav><div className="terminal-range" role="group" aria-label={t("terminal.range")}>{t("terminal.range")} {(["1h","24h","7d","30d"] as Range[]).map(v=><button key={v} type="button" aria-pressed={range===v} onClick={()=>setRange(v)}>{v}</button>)}</div><div className="terminal-theme" role="group" aria-label={t("terminal.theme")}>{(["system","light","dark"] as const).map(mode=><button type="button" key={mode} aria-pressed={themeMode===mode} onClick={()=>setTheme(mode)}>{mode === "system" ? t("terminal.system") : mode === "light" ? t("terminal.light") : t("terminal.dark")}</button>)}</div></div>
+      <div className="terminal-tabs"><nav className="tabs" aria-label={t("ui.views.24be6")}>{terminalViews.filter(v=>!preferences.hiddenTabs.includes(v)).map(v=>{const index=terminalViews.indexOf(v);return <button type="button" key={v} aria-pressed={view===v||(v==="machine"&&view==="storage")} onClick={()=>go(v)}>{index===9?0:index+1} {t(navigationLabels[v as keyof typeof navigationLabels], preferences.language).toLowerCase()}</button>})}<button type="button" className="terminal-search" onClick={()=>setPalette(true)} aria-label={t("ui.search.or.jump.to.commands.control.or.command.k.26860")} title={t("ui.search.or.jump.to.commands.ctrl.k.50228")}>{t("ui.k.64d86")}</button>{hosts.length>1?<button type="button" onClick={()=>go("fleet")}>{t("ui.view.fleet.8d8a0").toLowerCase()} {formatNumber(fleet.filter(h=>h.liveness==="live").length)}/{formatNumber(fleet.length)}</button>:null}<button type="button" aria-pressed={view==="settings"} onClick={()=>go("settings")}>{t("ui.settings.c7f73",preferences.language).toLowerCase()}</button><button type="button" aria-pressed={view==="glossary"} onClick={()=>go("glossary")}>{t("terminal.glossary")}</button></nav><div className="terminal-range" role="group" aria-label={t("terminal.range")}>{t("terminal.range")} {(["1h","24h","7d","30d"] as Range[]).map(v=><button key={v} type="button" aria-pressed={range===v} onClick={()=>setRange(v)}>{v}</button>)}</div></div>
       </div>
       {auth === "offline" ? (
         <main className="auth g"><h1>{t("pwa.offline")}</h1><p>{t("pwa.last_data", {at:(() => { try { const at = window.localStorage.getItem("fleetglass:last-data-at"); return at ? formatDateTime(at) : t("value.unknown"); } catch { return t("value.unknown"); } })()})}</p><button onClick={() => location.reload()}>{t("ui.retry.9f5cd")}</button></main>

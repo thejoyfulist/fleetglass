@@ -72,6 +72,7 @@ def inspect(page, width):
       const visible=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0};
       if(document.documentElement.scrollWidth>innerWidth+1)errors.push('page horizontal scroll');
       if(document.querySelector('select'))errors.push('native select rendered');
+      if(document.querySelector('main svg circle'))errors.push('SVG circle gauge in content');
       for(const e of document.querySelectorAll('main *')){
         if(!visible(e))continue;
         const s=getComputedStyle(e);
@@ -84,6 +85,15 @@ def inspect(page, width):
         for(const body of document.querySelectorAll('.terminal-box-body, main .g.t'))if(body.scrollWidth>body.clientWidth+1)errors.push('panel overflow: '+(body.parentElement.getAttribute('aria-label')||body.className));
         for(const scroller of document.querySelectorAll('main .terminal-table-scroll'))if(scroller.scrollWidth>scroller.clientWidth+1)errors.push('table overflow: '+scroller.closest('section')?.getAttribute('aria-label'));
         for(const cell of document.querySelectorAll('main .terminal-data-table td.numeric'))if(cell.scrollWidth>cell.clientWidth+1)errors.push('numeric cell clipped: '+cell.innerText);
+      }
+      if(width===1280 || width===1440){
+        const tabs=document.querySelector('.terminal-tabs .tabs');
+        const buttons=[...tabs.querySelectorAll('button')];
+        if(buttons.length && Math.max(...buttons.map(b=>b.getBoundingClientRect().top))-Math.min(...buttons.map(b=>b.getBoundingClientRect().top))>1)errors.push('tab row wraps');
+        if(tabs.scrollWidth>tabs.clientWidth+1)errors.push('desktop tabs clipped');
+        const status=[...document.querySelectorAll('.terminal-status > *')].filter(visible);
+        if(status.length && Math.max(...status.map(e=>e.getBoundingClientRect().top+e.getBoundingClientRect().height/2))-Math.min(...status.map(e=>e.getBoundingClientRect().top+e.getBoundingClientRect().height/2))>8)errors.push('status line wraps');
+        if(document.querySelector('.terminal-status').scrollWidth>document.querySelector('.terminal-status').clientWidth+1)errors.push('desktop status clipped');
       }
       const tag=document.querySelector('.terminal-warn .terminal-tag');
       if(tag&&getComputedStyle(tag).backgroundColor!=='rgb(0, 166, 178)')errors.push('warning tag colour');
@@ -160,6 +170,10 @@ def main():
                         if 'ECB rate' in str(page.locator('table').all_inner_texts()): errors.append(f"{theme}: Costs table repeats conversion source")
                         if page.locator('main').inner_text().count('EUR at ECB rate Oct 9') != 1: errors.append(f"{theme}: Costs conversion source is not shown once")
                     errors.extend(f"{view}-{theme}: {e}" for e in inspect(page,1440))
+                    if view in ("overview", "agents"):
+                        page.set_viewport_size({"width":1280,"height":900})
+                        errors.extend(f"{view}-{theme}-1280: {e}" for e in inspect(page,1280))
+                        page.set_viewport_size({"width":1440,"height":900})
                     if view=="agents" and 'Claude · not reported' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: Agents quota status missing")
                     page.screenshot(path=str(OUT/f"{view}-{theme}.png"),full_page=True)
                     if view in ("overview", "agents"):

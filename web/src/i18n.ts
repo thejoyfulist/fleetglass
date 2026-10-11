@@ -42,6 +42,8 @@ export const messages = {
   "terminal.label_name": ["name", "nom"],
   "terminal.label_package": ["package", "boîtier"],
   "terminal.label_per_core": ["per-core", "par cœur"],
+  "terminal.theme": ["theme", "thème"],
+  "terminal.label_source": ["source", "origine"],
   "terminal.label_plan": ["plan", "forfait"],
   "terminal.label_port": ["port", "port"],
   "terminal.label_pressure": ["pressure", "pression"],
@@ -105,11 +107,7 @@ export const messages = {
   "terminal.views": ["views", "vues"],
   "terminal.filter": ["filter", "filtrer"],
   "terminal.search": ["search", "rechercher"],
-  "terminal.theme": ["theme", "thème"],
   "terminal.glossary": ["glossary", "glossaire"],
-  "terminal.system": ["system", "système"],
-  "terminal.light": ["light", "clair"],
-  "terminal.dark": ["dark", "sombre"],
   "terminal.status_up": ["up", "actif depuis"],
   "terminal.status_kernel": ["kernel", "noyau"],
   "terminal.status_load": ["load", "charge"],
@@ -146,9 +144,6 @@ export const messages = {
   "session.duration": ["Duration", "Durée"],
   "session.spawned": ["Spawned processes", "Processus lancés"],
   "session.no_spawned": ["No spawned processes observed", "Aucun processus lancé observé"],
-  "quota.advice_ahead": ["{agent} is ahead of pace on {window} ({used}); projected limit {projected}", "{agent} dépasse le rythme sur {window} ({used}) ; limite prévue le {projected}"],
-  "quota.room": ["{agent} has room on {window} ({used}); projected limit {projected}", "{agent} a de la marge sur {window} ({used}) ; limite prévue le {projected}"],
-  "quota.no_projection": ["{agent} on {window} ({used}): {pace}; limit time unavailable", "{agent} sur {window} ({used}) : {pace} ; heure de limite indisponible"],
   "project.left_behind": ["Left behind by agents", "Laissés par les agents"],
   "project.witnessed_ancestry": ["Witnessed process tree", "Arbre de processus observé"],
   "project.freeable": ["Estimated freeable process RSS: {memory}", "Mémoire RSS potentiellement libérable (estimation) : {memory}"],
@@ -236,11 +231,6 @@ export const messages = {
   "chart.trend": ["{label} trend over selected period", "Tendance de {label} sur la période choisie"],
   "chart.checks_normal": ["{good} of {total} checks normal", "{good} contrôles normaux sur {total}"],
   "chart.no_checks": ["No checks reported", "Aucun contrôle signalé"],
-  "chart.of_checks": ["of {total} checks", "sur {total} contrôles"],
-  "chart.gauge": ["{label}: {used} used, pace {pace}", "{label} : {used} utilisés, rythme prévu {pace}"],
-  "chart.latest": ["{label} over {period}. Latest {latest}.", "{label} sur {period}. Dernière valeur : {latest}."],
-  "chart.secondary": ["Right axis latest {latest} {unit}.", "Dernière valeur sur l’axe droit : {latest} {unit}."],
-  "chart.no_secondary": ["No secondary series.", "Aucune deuxième série."],
   "chart.response": ["{label} response time over {period} in milliseconds, with {failed} failed or unknown samples", "Temps de réponse de {label} sur {period} en millisecondes, avec {failed} mesures en échec ou inconnues"],
 
   "network.sign_in_required": ["Sign in required", "Connexion requise"],
@@ -383,7 +373,6 @@ export const messages = {
   "ui.the.card.is.drawn.in.this.browser.no.project.nam.00d8c": ["The card is drawn in this browser. No project name is included.","La carte est dessinée dans ce navigateur. Aucun nom de projet n’y figure."],
   "ui.download.png.0c830": ["Download PNG","Télécharger le PNG"],
   "ui.preview.f1fbb": ["Preview","Aperçu"],
-  "ui.now.c9bc8": ["now","maintenant"],
   "agent.state.working": ["Working", "En cours"],
   "agent.state.running": ["Running", "En cours d’exécution"],
   "agent.state.waiting_for_input": ["Waiting for input", "En attente de saisie"],
@@ -432,7 +421,6 @@ export const messages = {
   "ui.state.reason.b5f5d": ["State / reason","État / motif"],
   "ui.cpu.by.process.f62e5": ["CPU by process","Processeur par processus"],
   "ui.memory.by.process.d76ce": ["Memory by process","Mémoire par processus"],
-  "ui.model.source.3a815": ["Model / source","Modèle / source"],
   "ui.method.88306": ["Method","Méthode"],
   "ui.coverage.80e13": ["Coverage","Couverture"],
   "ui.journal.last.24.h.acc7b": ["journal, last 24 h", "journal, dernières 24 h"],
@@ -569,10 +557,6 @@ export const messages = {
   "ui.no.quota.observations.reported.42bea": [
     "No quota observations reported.",
     "Aucune mesure de quota signalée."
-  ],
-  "ui.resets.5de1b": [
-    "· resets",
-    "· réinitialisation"
   ],
   "ui.tokens.33914": [
     "tokens",
@@ -1166,18 +1150,6 @@ export const messages = {
     "Start the agent to populate this cockpit.",
     "Démarrez l’agent pour alimenter ce tableau de bord."
   ],
-  "ui.of.de04f": [
-    "of",
-    "sur"
-  ],
-  "ui.hosts.reporting.57618": [
-    "hosts reporting",
-    "hôtes avec des mesures"
-  ],
-  "ui.need.attention.c8806": [
-    "need attention",
-    "à surveiller"
-  ],
   "ui.view.fleet.8d8a0": [
     "View fleet →",
     "Voir le parc →"
@@ -1269,10 +1241,6 @@ export const messages = {
   "ui.the.agent.scans.configured.roots.once.per.hour.2fffc": [
     "The agent scans configured roots once per hour.",
     "L’agent analyse les racines configurées une fois par heure."
-  ],
-  "ui.at.27e90": [
-    "at",
-    "à"
   ],
   "ui.theme.a797e": [
     "Theme",

@@ -1345,3 +1345,12 @@ body{background:var(--ground);font:12.5px/1.5 var(--mono);padding:20px 16px 40px
 }
 .core-track,.app-share,.bar,.meter{display:none!important}
 .stat-grid{display:block;margin:0}.stat-grid>div,.uptime-stats>div{display:flex;align-items:baseline;justify-content:flex-start;gap:2ch;padding:0!important;margin:0;border:0!important;background:none!important;min-height:0;box-shadow:none}.stat-grid>div>span,.uptime-stats>div>small{min-width:18ch;color:var(--ink2);font:inherit}.stat-grid>div>b,.uptime-stats>div>b{font:inherit;color:var(--ink);overflow-wrap:anywhere}.uptime-stats{display:block;margin:.5em 0}.observation-summary strong,.fleet-stat strong,.app-intro strong{font:700 14px/1.5 var(--mono)}.observation-summary,.fleet-stat,.app-intro{min-height:0;padding:13px 1.2ch 8px}.observation-summary p,.fleet-stat span,.app-intro p{margin:.25em 0;font:inherit}.app-intro{margin-bottom:12px;display:block}.app-intro>div{display:flex;flex-direction:row;gap:2ch}.terminal-daily-bars{display:flex;gap:1ch;white-space:nowrap;max-width:100%;overflow-x:auto}.app-filters input[type="search"],.terminal-filters input[type="search"]{font:inherit;background:var(--solid);border:0;border-bottom:1px solid var(--edge);color:var(--ink);width:16ch;padding:0 .5ch}.app-filters label,.terminal-filters label{display:inline-flex;align-items:center;gap:.5ch}
+
+/* Compact terminal header; tabs scroll within their row on narrow screens. */
+.terminal-status{flex-wrap:nowrap;gap:0 .5ch;white-space:nowrap;font-size:11.5px;overflow-x:auto;scrollbar-width:thin}
+.terminal-tabs{flex-wrap:nowrap;align-items:center;gap:.5ch;overflow:hidden}
+.terminal-tabs .tabs{flex:1 1 auto;min-width:0;max-width:none;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;gap:0 .2ch;white-space:nowrap}
+.terminal-tabs .tabs button{flex:none;padding:0 .15ch}
+.terminal-tabs .terminal-range{flex:none;margin-left:auto}
+.terminal-chart{font:inherit;overflow-x:auto}.terminal-chart-row{display:flex;align-items:baseline;gap:1ch;white-space:nowrap}.terminal-chart-row>span:first-child{min-width:12ch;color:var(--ink2)}.terminal-chart-row>span:last-child{margin-left:auto}.terminal-spark{font:inherit;letter-spacing:0;color:var(--ink);white-space:nowrap}.terminal-checks{display:inline-flex;align-items:center;gap:1ch;white-space:nowrap}
+@media(max-width:699px){.terminal-tabs{overflow-x:auto}.terminal-tabs .tabs{flex:none;width:max-content;max-width:none;overflow:visible}.terminal-status{display:none}}
