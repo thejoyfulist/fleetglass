@@ -1,5 +1,9 @@
 import {describe, expect, it} from "vitest";
-import {attentionLabel, blockBar, formatTextTable, measuredSpeed, truncateName, truncateSessionLabel} from "./terminal-format";
+import {attentionLabel, blockBar, editAge, formatTextTable, measuredSpeed, truncateName, truncateSessionLabel} from "./terminal-format";
+
+it("formats observed file edit age", () => {
+  expect([editAge(undefined), editAge(3), editAge(27), editAge(61), editAge(1440)]).toEqual(["-", "3m", "27m", "1h", "1d"]);
+});
 
 describe("terminal text rendering", () => {
   it("aligns columns and preserves markup tones", () => {

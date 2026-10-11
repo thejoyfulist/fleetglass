@@ -24,6 +24,9 @@ fixture.AGENTS[2].update({"id": "0b82eee0abcd", "kind": "claude", "project": "un
 fixture.AGENTS[0].update({"source":"otlp", "sources":["otlp","process"], "provenance":{"state":"otlp","tokens":"otlp","speed":"estimated","cost":"estimated","resources":"process","model":"otlp","project":"process"}})
 fixture.AGENTS[1].update({"source":"log", "sources":["log","process"], "provenance":{"state":"log","tokens":"log","speed":"estimated","cost":"estimated","resources":"process","model":"log","project":"process"}})
 fixture.AGENTS[2].update({"source":"otlp", "sources":["otlp","log","process"], "provenance":{"state":"log","tokens":"otlp","speed":"otlp","cost":"estimated","resources":"process","model":"log","project":"log"}})
+fixture.AGENTS[0].update({"last_file_edit_at":fixture.iso(-180),"last_tool_at":fixture.iso(-60),"last_tool":"Edit","minutes_since_file_edit":3,"activity":"editing","flag":False,"provenance":{**fixture.AGENTS[0]["provenance"],"file_edit":"otel","tool":"otel"}})
+fixture.AGENTS[1].update({"state":"working","last_file_edit_at":fixture.iso(-1620),"last_tool_at":fixture.iso(-60),"last_tool":"Bash","minutes_since_file_edit":27,"activity":"working, no file changes for 27m (possibly looping)","flag":True,"provenance":{**fixture.AGENTS[1]["provenance"],"file_edit":"log","tool":"log"}})
+fixture.AGENTS[2].update({"state":"idle","last_file_edit_at":fixture.iso(-3600),"last_tool_at":fixture.iso(-2400),"last_tool":"Read","minutes_since_file_edit":60,"activity":"idle","flag":False,"provenance":{**fixture.AGENTS[2]["provenance"],"file_edit":"otel","tool":"otel"}})
 fixture.AGENTS.append({"id":"process-only-demo", "kind":"codex", "project":"demo", "worktree":"", "at":fixture.iso(), "state":"running", "reason":"process alive", "source":"process", "sources":["process"], "provenance":{"state":"process","resources":"process","project":"process"}, "pid":2999, "cpu_percent":1.0, "rss_bytes":128*1024**2, "model":""})
 fixture.QUOTAS[:] = [{"kind": "codex", "window": "primary", "window_minutes": 10080,
                       "used_percent": 42, "resets_at": fixture.iso(4 * 86400),
@@ -46,6 +49,7 @@ fixture.RESULTS.extend([
     fixture.result(f"recent_error:{i}", {"count": i + 1}, state="warn", detail="journal error group") | {"fields": {"unit": f"demo-{i}.service"}}
     for i in range(5)
 ])
+fixture.RESULTS.insert(0, fixture.result("agent_loop:session-2", state="warn", detail="codex · orbit · session-2 generating ~42.5 tok/s, no file edit for 27 min - possibly looping"))
 fixture.RESULTS.append(fixture.result("repository:0:atlas", {"dirty": 1, "dirty_count": 4}, state="warn", detail="4 uncommitted files") | {"fields": {"repository": "atlas"}})
 
 OUT = Path(tempfile.mkdtemp(prefix="fleetglass-m10-views-"))
@@ -132,20 +136,31 @@ def inspect_sticky_tabs(page):
       return errors;
     }""")
 
+def inspect_loop_flag(page):
+    return page.evaluate("""() => {
+      const table=document.querySelector('.agent-table');
+      const flag=[...table?.querySelectorAll('.terminal-warn')||[]].find(e=>e.textContent.includes('loop?'));
+      const head=[...table?.querySelectorAll('th')||[]].find(e=>e.textContent.trim()==='edit');
+      if(!flag||!head)return ['edit column or WARN loop? missing'];
+      flag.scrollIntoView({block:'nearest',inline:'nearest'});
+      const r=flag.getBoundingClientRect(), p=table.getBoundingClientRect();
+      return r.left<p.left-1||r.right>p.right+1?['WARN loop? clipped']:[];
+    }""")
+
 def inspect_detail_metrics(page):
-    page.locator('.agent-table .terminal-link').first.click()
+    page.locator('.agent-table tbody tr').nth(1).locator('button').first.click()
     page.locator('#session-detail .session-metric').first.wait_for()
     return page.evaluate("""() => {
       const rows=[...document.querySelectorAll('#session-detail .session-metric')];
       const errors=[];
       if(document.documentElement.scrollWidth>innerWidth+1) errors.push('page horizontal scroll with detail open');
-      if(rows.length!==8) errors.push(`expected 8 metric rows, got ${rows.length}`);
+      if(rows.length!==11) errors.push(`expected 11 metric rows, got ${rows.length}`);
       const x=[];
       for(const row of rows){
         const cells=[...row.children];
         if(cells.length!==3) {errors.push('metric row missing feed column');continue}
         const [label,value,feed]=cells;
-        if(value.textContent.trim()!=='-' && !feed.textContent.trim()) errors.push(`missing feed: ${label.textContent}`);
+        if(value.textContent.trim()!=='-' && label.textContent!=='activity' && !feed.textContent.trim()) errors.push(`missing feed: ${label.textContent}`);
         if(value.textContent.trim()==='-' && feed.textContent.trim()) errors.push(`feed on missing value: ${label.textContent}`);
         if(row.scrollWidth>row.clientWidth+1 || feed.getBoundingClientRect().right>innerWidth+1) errors.push(`metric clipped: ${label.textContent}`);
         x.push(feed.getBoundingClientRect().left);
@@ -207,8 +222,14 @@ def main():
                         errors.extend(f"{view}-{theme}-1280: {e}" for e in inspect(page,1280))
                         page.set_viewport_size({"width":1440,"height":900})
                     if view=="agents" and 'Claude · not reported' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: Agents quota status missing")
-                    if view=="agents": errors.extend(f"agents-{theme}-detail: {e}" for e in inspect_detail_metrics(page))
-                    page.screenshot(path=str(OUT/f"{view}-{theme}.png"),full_page=True)
+                    if view=="agents":
+                        if theme=="dark":
+                            page.screenshot(path=str(OUT/"loop-flag-dark.png"), full_page=False)
+                            page.screenshot(path=str(OUT/"agents-dark.png"), full_page=True)
+                        errors.extend(f"agents-{theme}-detail: {e}" for e in inspect_detail_metrics(page))
+                        if theme=="dark": page.screenshot(path=str(OUT/"agents-detail-dark.png"), full_page=False)
+                        errors.extend(f"{theme}: {e}" for e in inspect_loop_flag(page))
+                    if view!="agents" or theme!="dark": page.screenshot(path=str(OUT/f"{view}-{theme}.png"),full_page=True)
                     if view in ("overview", "agents"):
                         errors.extend(f"{view}-{theme}-desktop: {e}" for e in inspect_sticky_tabs(page))
                     if view=="overview":
@@ -245,7 +266,9 @@ def main():
                 for view in ("overview", "agents"):
                     mobile.goto(f"http://127.0.0.1:{server.server_port}/{'' if view=='overview' else view}",wait_until="networkidle")
                     errors.extend(f"{view}-{theme}-mobile: {e}" for e in inspect(mobile,390))
-                    if view=="agents": errors.extend(f"agents-{theme}-mobile-detail: {e}" for e in inspect_detail_metrics(mobile))
+                    if view=="agents":
+                        errors.extend(f"agents-{theme}-mobile-detail: {e}" for e in inspect_detail_metrics(mobile))
+                        errors.extend(f"{theme}: mobile {e}" for e in inspect_loop_flag(mobile))
                     if view == "overview":
                         mobile.screenshot(path=str(OUT/f"overview-{theme}-mobile.png"),full_page=True)
                     errors.extend(f"{view}-{theme}-mobile: {e}" for e in inspect_sticky_tabs(mobile))

@@ -7,6 +7,31 @@ import (
 	"testing"
 )
 
+func TestAgentNoEditMinutes(t *testing.T) {
+	c, err := Load("")
+	if err != nil || c.AgentNoEditMinutes != 20 {
+		t.Fatalf("default: %d %v", c.AgentNoEditMinutes, err)
+	}
+	for _, tc := range []struct {
+		raw   string
+		valid bool
+		want  int
+	}{
+		{`{"agent_no_edit_minutes":1}`, true, 1},
+		{`{"agent_no_edit_minutes":0}`, false, 0},
+		{`{"agent_no_edit_minutes":1441}`, false, 0},
+	} {
+		path := filepath.Join(t.TempDir(), "config.json")
+		if err := os.WriteFile(path, []byte(tc.raw), 0600); err != nil {
+			t.Fatal(err)
+		}
+		got, err := Load(path)
+		if (err == nil) != tc.valid || err == nil && got.AgentNoEditMinutes != tc.want {
+			t.Fatalf("%s: %+v %v", tc.raw, got, err)
+		}
+	}
+}
+
 func TestHTTPProbeConfigAndStatusListenerDefault(t *testing.T) {
 	c, err := Load("")
 	if err != nil {

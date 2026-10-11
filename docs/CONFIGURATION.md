@@ -29,6 +29,7 @@ All fields are optional unless noted. Fleetglass reads one JSON file for the ser
 | `otlp_token` | empty | Optional OTLP bearer token. |
 | `ai_log_roots` | `[]` | Optional `{kind: "claude" or "codex", path: "/absolute/root"}` entries. |
 | `agent_commands` | `["claude","codex"]` | Process names eligible for agent attribution. |
+| `agent_no_edit_minutes` | `20` | Positive threshold (1–1440 minutes) for the possible-loop review flag on active sessions with observed tool data. |
 | `worktree_roots` | `[]` | Roots laid out as project/worktree. |
 | `project_roots` | `[]` | Roots of local projects, one project per child directory. |
 | `storage_roots` | `["/","/home","/var"]` | Bounded depth-two storage map roots. |

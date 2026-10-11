@@ -108,6 +108,18 @@ func TestOTLPFormatsAndAllowlist(t *testing.T) {
 	}
 }
 
+func TestOTLPFileToolTimestamps(t *testing.T) {
+	x := NewReceiver()
+	now := uint64(time.Now().UnixNano())
+	attrs := []*common.KeyValue{attr("session.id", "synthetic-session"), attr("tool_name", "apply_patch")}
+	l := &logspb.ResourceLogs{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{TimeUnixNano: now, EventName: "codex.tool_result", Attributes: attrs}}}}}
+	sendOTLP(t, x.Handler(""), "/v1/logs", "resourceLogs", l, false, false)
+	got := x.Drain()
+	if len(got.Sessions) != 1 || got.Sessions[0].LastFileEditAt.IsZero() || got.Sessions[0].LastToolAt.IsZero() || got.Sessions[0].Provenance.FileEdit != "otel" {
+		t.Fatalf("%+v", got.Sessions)
+	}
+}
+
 func TestCumulativeMetricsUseDelta(t *testing.T) {
 	x := NewReceiver()
 	h := x.Handler("")

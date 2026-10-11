@@ -179,6 +179,8 @@ func (s AISubscription) Amount() (float64, string) {
 }
 
 type AgentProvenance struct {
+	FileEdit  string `json:"file_edit,omitempty"`
+	Tool      string `json:"tool,omitempty"`
 	State     string `json:"state,omitempty"`
 	Tokens    string `json:"tokens,omitempty"`
 	Cost      string `json:"cost,omitempty"`
@@ -219,6 +221,12 @@ type AgentSession struct {
 	LastTurnEnded        bool            `json:"last_turn_ended,omitempty"`
 	LastStatus           string          `json:"last_status,omitempty"`
 	LastTool             string          `json:"last_tool,omitempty"`
+	LastToolAt           time.Time       `json:"last_tool_at,omitzero"`
+	LastUsageAt          time.Time       `json:"last_usage_at,omitzero"`
+	LastFileEditAt       time.Time       `json:"last_file_edit_at,omitzero"`
+	MinutesSinceFileEdit *int            `json:"minutes_since_file_edit,omitempty"`
+	Activity             string          `json:"activity"`
+	Flag                 bool            `json:"flag"`
 	RequestDurationMS    float64         `json:"request_duration_ms,omitempty"`
 }
 

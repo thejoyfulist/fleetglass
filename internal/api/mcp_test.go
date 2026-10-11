@@ -86,3 +86,21 @@ func TestMCPProtocolReadOnlyAndToken(t *testing.T) {
 		t.Fatalf("origin: %d", w.Code)
 	}
 }
+
+func TestMCPRunningIncludesPossibleLoopFlag(t *testing.T) {
+	s, err := store.Open(filepath.Join(t.TempDir(), "mcp-loop.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	now := time.Now().UTC()
+	id := strings.Repeat("a", 64)
+	session := model.AgentSession{ID: id, Kind: "codex", At: now, StartedAt: now.Add(-time.Hour), State: "working", Source: "otlp", LastTool: "Bash", LastToolAt: now, LastFileEditAt: now.Add(-27 * time.Minute)}
+	if err := s.Ingest(model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{session}}}); err != nil {
+		t.Fatal(err)
+	}
+	data, why := New(s, "", "").mcpCall("what_is_running", "host", "", "", 0)
+	if why != "" || !strings.Contains(string(data), `"flag":true`) || !strings.Contains(string(data), "possibly looping") {
+		t.Fatalf("%s %s", why, data)
+	}
+}

@@ -49,6 +49,7 @@ type Config struct {
 		Path string `json:"path"`
 	} `json:"ai_log_roots"`
 	AgentCommands         []string                 `json:"agent_commands"`
+	AgentNoEditMinutes    int                      `json:"agent_no_edit_minutes"`
 	WorktreeRoots         []string                 `json:"worktree_roots"`
 	ProjectRoots          []string                 `json:"project_roots"`
 	StorageRoots          []string                 `json:"storage_roots"`
@@ -151,7 +152,7 @@ func validDNSName(name string) bool {
 
 func Load(path string) (Config, error) {
 	host, _ := os.Hostname()
-	c := Config{HostID: host, ServerURL: "http://127.0.0.1:7878", Listen: "127.0.0.1:7878", OTLPListen: "127.0.0.1:4318", ProcRoot: "/proc", SysRoot: "/sys", DockerSockets: []string{"/var/run/docker.sock"}, HelperSocket: "/run/fleetglass/helper.sock", DBPath: "fleetglass.db", LiveMaxSubscribers: 32, AgentCommands: []string{"claude", "codex"}, StorageRoots: []string{"/", "/home", "/var"}, EnergyCurrency: "EUR", DisplayCurrency: "USD", APTHistoryPath: "/var/log/apt"}
+	c := Config{HostID: host, ServerURL: "http://127.0.0.1:7878", Listen: "127.0.0.1:7878", OTLPListen: "127.0.0.1:4318", ProcRoot: "/proc", SysRoot: "/sys", DockerSockets: []string{"/var/run/docker.sock"}, HelperSocket: "/run/fleetglass/helper.sock", DBPath: "fleetglass.db", LiveMaxSubscribers: 32, AgentCommands: []string{"claude", "codex"}, AgentNoEditMinutes: 20, StorageRoots: []string{"/", "/home", "/var"}, EnergyCurrency: "EUR", DisplayCurrency: "USD", APTHistoryPath: "/var/log/apt"}
 	c.BufferDir = "/var/lib/fleetglass/buffer"
 	if path != "" {
 		f, err := os.Open(path)
@@ -233,6 +234,9 @@ func Load(path string) (Config, error) {
 	}
 	if c.LiveMaxSubscribers <= 0 {
 		return c, fmt.Errorf("live_max_subscribers must be positive")
+	}
+	if c.AgentNoEditMinutes <= 0 || c.AgentNoEditMinutes > 1440 {
+		return c, fmt.Errorf("agent_no_edit_minutes must be between 1 and 1440")
 	}
 	if c.ClaudeBudget5H < 0 || c.ClaudeBudgetWeek < 0 {
 		return c, fmt.Errorf("Claude budgets must be nonnegative")

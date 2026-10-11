@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/thejoyfulist/fleetglass/internal/ai"
 	"github.com/thejoyfulist/fleetglass/internal/config"
 	"github.com/thejoyfulist/fleetglass/internal/model"
 	"github.com/thejoyfulist/fleetglass/internal/money"
@@ -21,39 +22,53 @@ import (
 )
 
 type API struct {
-	DisplayDefaults   config.DisplayDefaults
-	Store             *store.Store
-	Token             string
-	LegacyHostID      string
-	ReadToken         string
-	MaxSubscribers    int
-	KeepAlive         time.Duration
-	AIPrices          map[string]model.AIPrice
-	AISubscriptions   []model.AISubscription
-	ClaudeBudget5H    int64
-	ClaudeBudgetWeek  int64
-	EnergyPricePerKWh float64
-	EnergyCurrency    string
-	DisplayCurrency   string
-	Money             *money.Service
-	Version           string
-	Commit            string
-	UpdateCheckURL    string
-	updateAt          time.Time
-	updateTag         string
-	updateMu          sync.Mutex
-	mu                sync.Mutex
-	subs              map[chan model.Overview]struct{}
-	sessions          map[string]time.Time
-	loginAttempts     map[string][]time.Time
+	DisplayDefaults    config.DisplayDefaults
+	Store              *store.Store
+	Token              string
+	LegacyHostID       string
+	ReadToken          string
+	MaxSubscribers     int
+	KeepAlive          time.Duration
+	AIPrices           map[string]model.AIPrice
+	AgentNoEditMinutes int
+	AISubscriptions    []model.AISubscription
+	ClaudeBudget5H     int64
+	ClaudeBudgetWeek   int64
+	EnergyPricePerKWh  float64
+	EnergyCurrency     string
+	DisplayCurrency    string
+	Money              *money.Service
+	Version            string
+	Commit             string
+	UpdateCheckURL     string
+	updateAt           time.Time
+	updateTag          string
+	updateMu           sync.Mutex
+	mu                 sync.Mutex
+	subs               map[chan model.Overview]struct{}
+	sessions           map[string]time.Time
+	loginAttempts      map[string][]time.Time
 }
 
 func New(s *store.Store, token, legacyHostID string) *API {
-	return &API{Store: s, Money: &money.Service{}, Token: token, LegacyHostID: legacyHostID, MaxSubscribers: 32, KeepAlive: 25 * time.Second, subs: map[chan model.Overview]struct{}{}, sessions: map[string]time.Time{}, loginAttempts: map[string][]time.Time{}}
+	return &API{Store: s, Money: &money.Service{}, Token: token, LegacyHostID: legacyHostID, AgentNoEditMinutes: 20, MaxSubscribers: 32, KeepAlive: 25 * time.Second, subs: map[chan model.Overview]struct{}{}, sessions: map[string]time.Time{}, loginAttempts: map[string][]time.Time{}}
 }
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
+}
+func loopDetail(s model.AgentSession) string {
+	minutes := noEditMinutes(s)
+	if s.SpeedTokensPerSecond != nil && *s.SpeedTokensPerSecond > 0 && !s.LastUsageAt.IsZero() && time.Since(s.LastUsageAt) <= 2*time.Minute {
+		return fmt.Sprintf("%s generating ~%.1f tok/s, no file edit for %d min - possibly looping", s.Label, *s.SpeedTokensPerSecond, minutes)
+	}
+	return fmt.Sprintf("%s active, no file edit for %d min - possibly looping", s.Label, minutes)
+}
+func noEditMinutes(s model.AgentSession) int {
+	if s.MinutesSinceFileEdit != nil {
+		return *s.MinutesSinceFileEdit
+	}
+	return max(0, int(time.Since(s.StartedAt).Minutes()))
 }
 func readTokenMatches(got, expected string) bool {
 	a, b := sha256.Sum256([]byte(got)), sha256.Sum256([]byte(expected))
@@ -88,6 +103,15 @@ func (a *API) Handler() http.Handler {
 			http.Error(w, "host not found", 404)
 			return
 		}
+		if sessions, err := a.Store.AgentsWithSummary(h.HostID, a.AIPrices); err == nil {
+			h.Agents = sessions
+		}
+		for i := range h.Agents {
+			ai.AssessActivity(&h.Agents[i], time.Now().UTC(), a.AgentNoEditMinutes)
+			if h.Agents[i].Flag {
+				h.Results = append(h.Results, model.Result{Name: "agent_loop:" + h.Agents[i].ID, State: model.Warn, Detail: loopDetail(h.Agents[i]), At: time.Now().UTC()})
+			}
+		}
 		writeJSON(w, h)
 	})
 	mux.HandleFunc("GET /api/v1/hosts/{id}/probes", func(w http.ResponseWriter, r *http.Request) {
@@ -115,6 +139,18 @@ func (a *API) Handler() http.Handler {
 		if e != nil {
 			http.Error(w, "storage error", 500)
 			return
+		}
+		if sessions, err := a.Store.AgentsWithSummary(r.PathValue("id"), a.AIPrices); err == nil {
+			for _, session := range sessions {
+				ai.AssessActivity(&session, time.Now().UTC(), a.AgentNoEditMinutes)
+				if session.Flag {
+					since := session.LastFileEditAt
+					if since.IsZero() {
+						since = session.StartedAt
+					}
+					v.Insights = append(v.Insights, store.Insight{Kind: "agent_loop", App: session.Label, Detail: loopDetail(session), Since: since})
+				}
+			}
 		}
 		writeJSON(w, v)
 	})
@@ -180,6 +216,7 @@ func (a *API) Handler() http.Handler {
 		}
 		out := make([]listedSession, 0, len(v))
 		for _, session := range v {
+			ai.AssessActivity(&session, time.Now().UTC(), a.AgentNoEditMinutes)
 			out = append(out, listedSession{session, a.convert(r, session.APIEquivalentUSD, "USD")})
 		}
 		writeJSON(w, out)
@@ -190,6 +227,7 @@ func (a *API) Handler() http.Handler {
 			http.Error(w, "session not found", 404)
 			return
 		}
+		ai.AssessActivity(&v.Session, time.Now().UTC(), a.AgentNoEditMinutes)
 		writeJSON(w, struct {
 			store.SessionDetail
 			APIMoney money.Amount `json:"api_money"`

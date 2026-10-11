@@ -12,7 +12,7 @@ export interface Result {
   at?: string;
   cadence_seconds?: number;
 }
-export interface SessionProvenance {state?:string;tokens?:string;cost?:string;speed?:string;speed_feed?:string;resources?:string;model?:string;project?:string}
+export interface SessionProvenance {state?:string;tokens?:string;cost?:string;speed?:string;speed_feed?:string;resources?:string;model?:string;project?:string;file_edit?:string;tool?:string}
 export interface Session {
   id: string;
   label?: string;
@@ -22,6 +22,12 @@ export interface Session {
   usage_measured?: boolean;
   speed_tokens_per_second?: number;
   speed_method?: string;
+  last_file_edit_at?: string;
+  last_tool_at?: string;
+  last_tool?: string;
+  minutes_since_file_edit?: number;
+  activity?: string;
+  flag?: boolean;
   kind: string;
   model?: string;
   project?: string;

@@ -326,6 +326,10 @@ func (x *Receiver) metrics(resources []*metricspb.ResourceMetrics) {
 						}
 						s.LastTurnEnded = old.LastTurnEnded
 						s.LastTool = old.LastTool
+						s.LastToolAt = old.LastToolAt
+						s.LastFileEditAt = old.LastFileEditAt
+						s.Provenance.FileEdit = old.Provenance.FileEdit
+						s.Provenance.Tool = old.Provenance.Tool
 						s.LastStatus = old.LastStatus
 						s.RequestDurationMS = old.RequestDurationMS
 						if old.State == "erroring" || old.State == "rate-limited" {
@@ -420,6 +424,14 @@ func (x *Receiver) logs(resources []*logspb.ResourceLogs) {
 					requestDuration = durationMS(first(a, "request_duration_ms", "duration_ms"))
 				}
 				s := model.AgentSession{ID: id, Kind: k, Model: safeTag(first(a, "model", "model_name")), At: at, StartedAt: at, State: state, Reason: reason, Source: "otlp", LastTurnEnded: ended, LastStatus: safeTag(status), LastTool: safeTag(first(a, "tool_name", "tool.name")), RequestDurationMS: requestDuration}
+				if s.LastTool != "" {
+					s.LastToolAt = at
+					s.Provenance.Tool = "otel"
+					if IsFileTool(s.LastTool) {
+						s.LastFileEditAt = at
+						s.Provenance.FileEdit = "otel"
+					}
+				}
 				if old, ok := x.sessions[id]; ok {
 					if !old.StartedAt.IsZero() && old.StartedAt.Before(s.StartedAt) {
 						s.StartedAt = old.StartedAt
@@ -435,6 +447,15 @@ func (x *Receiver) logs(resources []*logspb.ResourceLogs) {
 					}
 					if s.LastTool == "" {
 						s.LastTool = old.LastTool
+					}
+					if old.LastToolAt.After(s.LastToolAt) {
+						s.LastToolAt = old.LastToolAt
+						s.LastTool = old.LastTool
+						s.Provenance.Tool = old.Provenance.Tool
+					}
+					if old.LastFileEditAt.After(s.LastFileEditAt) {
+						s.LastFileEditAt = old.LastFileEditAt
+						s.Provenance.FileEdit = old.Provenance.FileEdit
 					}
 					if s.RequestDurationMS == 0 {
 						s.RequestDurationMS = old.RequestDurationMS

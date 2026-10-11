@@ -179,6 +179,9 @@ func (s *Store) AgentsWithSummary(host string, overrides map[string]model.AIPric
 				continue
 			}
 			v := &sessions[i]
+			if u.At.After(v.LastUsageAt) {
+				v.LastUsageAt = u.At
+			}
 			if !containsSessionSource(v.Sources, u.Source) {
 				v.Sources = append(v.Sources, u.Source)
 			}

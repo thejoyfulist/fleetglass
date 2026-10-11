@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/thejoyfulist/fleetglass/internal/ai"
 	"net/http"
 	"strings"
 	"time"
@@ -110,6 +111,12 @@ func (a *API) mcpCall(name, host, figure, at string, port int) ([]byte, string) 
 		apps, e := a.Store.Apps(host, "1h", time.Now().UTC())
 		if e != nil {
 			return nil, "data unavailable"
+		}
+		if sessions, err := a.Store.AgentsWithSummary(host, a.AIPrices); err == nil {
+			overview.Agents = sessions
+		}
+		for i := range overview.Agents {
+			ai.AssessActivity(&overview.Agents[i], time.Now().UTC(), a.AgentNoEditMinutes)
 		}
 		answer = map[string]any{"host": host, "at": overview.At, "apps": apps.Apps, "agents": overview.Agents}
 	case "figure_attribution":

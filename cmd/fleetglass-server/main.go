@@ -92,6 +92,7 @@ func main() {
 	a.ReadToken = c.ReadToken
 	a.MaxSubscribers = c.LiveMaxSubscribers
 	a.AIPrices = c.AIPrices
+	a.AgentNoEditMinutes = c.AgentNoEditMinutes
 	a.AISubscriptions = c.AISubscriptions
 	a.ClaudeBudget5H = c.ClaudeBudget5H
 	a.ClaudeBudgetWeek = c.ClaudeBudgetWeek

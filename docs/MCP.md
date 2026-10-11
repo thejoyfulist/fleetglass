@@ -2,6 +2,8 @@
 
 Fleetglass's MCP endpoint is **off by default**. It uses a separate Streamable HTTP listener, bound to a loopback IP, and requires its own bearer token. It exposes four read-only tools: `what_is_running`, `figure_attribution`, `what_is_on_port`, and `host_status`. There are no action tools. The result reflects observations, not a complete process or port inventory; configured project roots determine which processes have port attribution. `host_status` includes observed uptime seconds, kernel release, and architecture when available.
 
+`what_is_running` includes each agent's `flag` and `activity`, plus the last observed file edit and tool timestamps when known. A `flag: true` is a possible-loop review hint using `agent_no_edit_minutes`; it does not prove that an agent is stuck or trigger any action.
+
 ## Enable locally
 
 Create a private token file (at least 32 characters, preferably 32 random bytes encoded as text), readable only by the Fleetglass server account. Add these fields to the **server** JSON configuration:

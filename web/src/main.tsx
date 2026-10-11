@@ -79,7 +79,7 @@ import { defaultPreferences, hasPreferences, readPreferences, savePreferences, u
 import type { Preferences } from "./preferences";
 import { activeLanguage, choiceLabel, navigationLabels, plural, sectionLabels, setLanguage, t as message } from "./i18n";
 import { TerminalOverview, TerminalTable, TerminalFilter, TerminalKV, TerminalBar } from "./terminal";
-import { truncateSessionLabel } from "./terminal-format";
+import { editAge, truncateSessionLabel } from "./terminal-format";
 import type { MessageKey } from "./i18n";
 import "./tokens.css";
 import "./style.css";
@@ -537,6 +537,9 @@ function AgentTable({
           [t("ui.memory.89c8a"),detailMetric(detail.session.pid && detail.session.rss_bytes !== undefined?formatBytes(detail.session.rss_bytes):null,detail.session.provenance?.resources)],
           [t("ui.state.a7250"),detailMetric(agentState(detail.session.state),detail.session.provenance?.state||detail.session.source)],
           [t("terminal.speed"),detailMetric(detail.session.speed_tokens_per_second == null?null:`${detail.session.speed_method==="estimated"?"~":""}${detail.session.speed_tokens_per_second.toFixed(1)} tok/s`,detail.session.provenance?.speed,detail.session.provenance?.speed_feed)],
+          [t("agent.last_file_edit"),detailMetric(detail.session.last_file_edit_at?`${editAge(detail.session.minutes_since_file_edit)} ago`:null,detail.session.provenance?.file_edit)],
+          [t("agent.last_tool"),detailMetric(detail.session.last_tool_at?`${detail.session.last_tool || "tool"} · ${editAge(Math.floor((Date.now()-new Date(detail.session.last_tool_at).getTime())/60000))} ago`:null,detail.session.provenance?.tool)],
+          [t("agent.activity"),detailMetric(detail.session.activity || "unknown",detail.session.provenance?.file_edit)],
           [t("terminal.label_model"),detailMetric(detail.session.model,detail.session.provenance?.model)],
           [t("ui.project.f6f4d"),detailMetric(detail.session.project && detail.session.project!=="unmatched"?`${sessionProject(detail.session)} / ${detail.session.worktree||"-"}`:null,detail.session.provenance?.project)],
         ] as [string,ReturnType<typeof detailMetric>][]).map(([label,metric])=><div className="session-metric" key={label}><span className="terminal-dim">{label}</span><span className="session-metric-value">{metric.value}</span><span className="session-metric-feed terminal-dim">{metric.tag}</span></div>)}</div>
@@ -546,10 +549,10 @@ function AgentTable({
       <div className="agent-table">
         <Table
           rowIds={agents.map((a) => `session-${a.id}`)}
-          right={compact?[2,3,4]:[3,4,5]}
+          right={compact?[2,3,4,5]:[3,4,5,6]}
           heads={
             compact
-              ? [t("ui.agent.5ce2e"), t("ui.state.a7250"), t("ui.cpu.ff221"), t("ui.memory.89c8a"), t("ui.tokens.c38c6"), t("agent.source.tag")]
+              ? [t("ui.agent.5ce2e"), t("ui.state.a7250"), t("ui.cpu.ff221"), t("ui.memory.89c8a"), t("ui.tokens.c38c6"), t("agent.edit"), t("agent.source.tag")]
               : [
                   t("ui.agent.5ce2e"),
                   t("ui.project.worktree.cbe27"),
@@ -557,6 +560,7 @@ function AgentTable({
                   t("ui.cpu.by.process.f62e5"),
                   t("ui.memory.by.process.d76ce"),
                   t("ui.tokens.c38c6"),
+                  t("agent.edit"),
                   t("terminal.label_model"),
                   t("agent.source.tag"),
                 ]
@@ -572,7 +576,7 @@ function AgentTable({
                       a.state === "waiting-for-input" ? "attention" : ""
                     }
                   >
-                    {agentState(a.state)}
+                    {agentState(a.state)}{a.flag?<span className="terminal-warn"> WARN loop?</span>:null}
                   </span>,
                   a.pid ? (
                     numericCell(t("ui.cpu.ff221"),<>{formatPercent(a.cpu_percent || 0)} <TerminalBar percent={a.cpu_percent || 0} width={8}/></>,a.provenance?.resources)
@@ -583,12 +587,13 @@ function AgentTable({
                   tokens.has(a.id)
                     ? numericCell(t("ui.tokens.c38c6"),formatTokens(tokens.get(a.id)!),a.provenance?.tokens)
                     : t("ui.unknown.bc781"),
+                  editAge(a.minutes_since_file_edit),
                   <a className="terminal-dim terminal-link" href={`/agents?session=${encodeURIComponent(a.id)}#session-detail`} title={t("agent.source.open_detail")}>{sessionSourceTag(a)}</a>,
                 ]
               : [
                   first,
                   `${sessionProject(a)} / ${a.worktree || t("value.unknown")}`,
-                  <span className={a.state === "erroring" || a.state === "rate-limited" ? "attention" : ""}>{agentState(a.state)}</span>,
+                  <span className={a.state === "erroring" || a.state === "rate-limited" ? "attention" : ""}>{agentState(a.state)}{a.flag?<span className="terminal-warn"> WARN loop?</span>:null}</span>,
                   a.pid ? (
                     numericCell(t("ui.cpu.ff221"),<>{formatPercent(a.cpu_percent || 0)} <TerminalBar percent={a.cpu_percent || 0} width={8}/></>,a.provenance?.resources)
                   ) : (
@@ -598,6 +603,7 @@ function AgentTable({
                   tokens.has(a.id)
                     ? numericCell(t("ui.tokens.c38c6"),formatTokens(tokens.get(a.id)!),a.provenance?.tokens)
                     : t("ui.unknown.bc781"),
+                  editAge(a.minutes_since_file_edit),
                   a.model || t("value.unknown_model"),
                   <a className="terminal-dim terminal-link" href={`#session-detail`} title={t("agent.source.open_detail")} onClick={()=>choose(a.id)}>{sessionSourceTag(a)}</a>,
                 ];
@@ -1786,7 +1792,7 @@ function App() {
             </div>
           ) : null}
           {view === "glossary" ? (
-            <div className="terminal-grid"><section className="terminal-box terminal-span-12" aria-label={t("terminal.glossary")}><h2>{t("terminal.glossary")}</h2><div className="terminal-box-body"><p>{t("terminal.glossary_intro")}</p><p>{t("terminal.glossary_bar")}</p><p>{t("terminal.glossary_unknown")}</p><p>{t("agent.glossary.otel")}</p><p>{t("agent.glossary.log")}</p><p>{t("agent.glossary.proc")}</p><p>{t("agent.glossary.estimated")}</p><p className="terminal-warn">{t("terminal.glossary_warn")}</p><p className="terminal-crit">{t("terminal.glossary_crit")}</p></div></section></div>
+            <div className="terminal-grid"><section className="terminal-box terminal-span-12" aria-label={t("terminal.glossary")}><h2>{t("terminal.glossary")}</h2><div className="terminal-box-body"><p>{t("terminal.glossary_intro")}</p><p>{t("terminal.glossary_bar")}</p><p>{t("terminal.glossary_unknown")}</p><p>{t("agent.loop.glossary")}</p><p>{t("agent.glossary.otel")}</p><p>{t("agent.glossary.log")}</p><p>{t("agent.glossary.proc")}</p><p>{t("agent.glossary.estimated")}</p><p className="terminal-warn">{t("terminal.glossary_warn")}</p><p className="terminal-crit">{t("terminal.glossary_crit")}</p></div></section></div>
           ) : view === "settings" ? (
             <SettingsView preferences={preferences} onChange={changePreferences} onReset={() => changePreferences(serverDefaults)} />
           ) : !host ? (

@@ -19,6 +19,7 @@
 ## Why Fleetglass
 
 - See which agent session and project is using CPU and memory, alongside token pace, model cost estimates, and subscription quotas.
+- Spot active sessions with no observed file-changing tool call for the configured interval; a cyan "loop?" flag suggests review.
 - Know where every number comes from: each session metric is tagged OpenTelemetry, local logs, process or estimated.
 - Check machine health, services, containers, projects, probes, and recent changes on one screen.
 - Keep observations private: loopback listeners by default, local storage, and read-only host access.
@@ -90,7 +91,7 @@ See [agent setup](docs/AI-AGENTS.md) for attribution, local log fallback, and qu
 
 | View | What it shows |
 | --- | --- |
-| Agents | Sessions, token speed, cost by model and project, quotas with pace |
+| Agents | Sessions, last observed file edit, possible-loop flag, token speed, cost by model and project, quotas with pace |
 | Server | CPU, temperature, storage, energy, network |
 | Services & uptime | systemd, containers, probes, TLS |
 | Projects | Development servers, ports, worktrees, idle processes |
@@ -102,6 +103,8 @@ See [agent setup](docs/AI-AGENTS.md) for attribution, local log fallback, and qu
 </table>
 
 Session metric sources: [light detail](assets/screenshots/agents-detail-light.png) · [dark detail](assets/screenshots/agents-detail-dark.png).
+
+[See the possible-loop flag in a synthetic 1440×900 capture](assets/screenshots/loop-flag-dark.png).
 
 Keyboard shortcuts: `1`–`9` views, `r` range, `/` search, `t` theme. The cockpit has light and dark themes and a mobile layout. [See the full screenshot set](assets/screenshots/).
 
@@ -146,6 +149,8 @@ This is a comparison of **focus**, not a feature audit of other projects. “—
 Alert delivery and incident workflows (ntfy, Telegram, email), then broader agent support. [Product scope](docs/PRODUCT.md) distinguishes what ships today from planned work.
 
 ## FAQ
+
+**Can it tell if an agent is stuck?** It can flag an active session that has not reported a file-changing tool call for 20 minutes by default. This is a hint, not proof of a loop: shell edits and missing tool telemetry remain unknown. [Activity rule and supported tools](docs/AI-AGENTS.md#file-edit-activity).
 
 **Does it send data?** No product telemetry is sent to the maintainers. Agents send measurements to the Fleetglass server you configure; optional update checks are off by default.
 

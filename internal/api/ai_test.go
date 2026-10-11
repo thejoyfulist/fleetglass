@@ -24,7 +24,7 @@ func TestAIEndpointsAndSSEOverview(t *testing.T) {
 	h := a.Handler()
 	id := strings.Repeat("a", 64)
 	now := time.Now().UTC()
-	batch := model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{{ID: id, Kind: "claude", Project: "demo", At: now, State: "working", Reason: "recent activity", Source: "otlp"}}, Usage: []model.AIUsage{{ID: strings.Repeat("b", 64), Session: id, Kind: "claude", Project: "demo", Model: "claude-sonnet-5", At: now, Source: "otlp", Tokens: model.Tokens{Input: 100}}}, Quotas: []model.Quota{{Kind: "codex", Window: "primary", Used: 50, ObservedAt: now, ResetsAt: now.Add(time.Hour), Method: "cli_reported"}}}}
+	batch := model.Batch{HostID: "host", At: now, AI: &model.AI{Sessions: []model.AgentSession{{ID: id, Kind: "claude", Project: "demo", At: now, StartedAt: now.Add(-time.Hour), LastFileEditAt: now.Add(-27 * time.Minute), LastToolAt: now, LastTool: "Bash", State: "working", Reason: "recent activity", Source: "otlp"}}, Usage: []model.AIUsage{{ID: strings.Repeat("b", 64), Session: id, Kind: "claude", Project: "demo", Model: "claude-sonnet-5", At: now, Source: "otlp", Tokens: model.Tokens{Input: 100}}}, Quotas: []model.Quota{{Kind: "codex", Window: "primary", Used: 50, ObservedAt: now, ResetsAt: now.Add(time.Hour), Method: "cli_reported"}}}}
 	b, _ := json.Marshal(batch)
 	r := httptest.NewRequest("POST", "/api/v1/ingest", bytes.NewReader(b))
 	r.Header.Set("Authorization", "Bearer secret")
@@ -38,6 +38,22 @@ func TestAIEndpointsAndSSEOverview(t *testing.T) {
 		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
 		if w.Code != 200 || !strings.Contains(w.Body.String(), match) {
 			t.Fatalf("%s: %d %s", path, w.Code, w.Body.String())
+		}
+	}
+	for _, path := range []string{"/api/v1/hosts/host/agents", "/api/v1/hosts/host/agents/" + id} {
+		w = httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+		for _, field := range []string{`"last_file_edit_at"`, `"last_tool_at"`, `"minutes_since_file_edit"`, `"activity"`, `"flag":true`} {
+			if !strings.Contains(w.Body.String(), field) {
+				t.Fatalf("%s missing %s: %s", path, field, w.Body.String())
+			}
+		}
+	}
+	for _, path := range []string{"/api/v1/hosts/host/overview", "/api/v1/hosts/host/observations"} {
+		w = httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+		if w.Code != 200 || !strings.Contains(w.Body.String(), "possibly looping") {
+			t.Fatalf("%s missing warning: %d %s", path, w.Code, w.Body.String())
 		}
 	}
 }

@@ -261,7 +261,26 @@ func (r *LogReader) Scan(now time.Time) model.AI {
 					if old, ok := r.latestSessions[session]; ok && !old.StartedAt.IsZero() && old.StartedAt.Before(started) {
 						started = old.StartedAt
 					}
-					sessions[session] = model.AgentSession{ID: session, Kind: root.Kind, Model: modelName, Project: project, Worktree: r.fileWorktree[path], At: at, StartedAt: started, State: "working", Reason: "recent log activity", Source: "log", LastTurnEnded: ended}
+					next := model.AgentSession{ID: session, Kind: root.Kind, Model: modelName, Project: project, Worktree: r.fileWorktree[path], At: at, StartedAt: started, State: "working", Reason: "recent log activity", Source: "log", LastTurnEnded: ended}
+					if old, ok := sessions[session]; ok {
+						next.LastTool, next.LastToolAt, next.LastFileEditAt, next.Provenance = old.LastTool, old.LastToolAt, old.LastFileEditAt, old.Provenance
+					} else if old, ok := r.latestSessions[session]; ok {
+						next.LastTool, next.LastToolAt, next.LastFileEditAt, next.Provenance = old.LastTool, old.LastToolAt, old.LastFileEditAt, old.Provenance
+					}
+					sessions[session] = next
+				}
+				for _, tool := range logToolNames(root.Kind, event) {
+					current := sessions[session]
+					if !at.Before(current.LastToolAt) {
+						current.LastTool = safeTag(tool)
+						current.LastToolAt = at
+						current.Provenance.Tool = "log"
+					}
+					if IsFileTool(tool) && !at.Before(current.LastFileEditAt) {
+						current.LastFileEditAt = at
+						current.Provenance.FileEdit = "log"
+					}
+					sessions[session] = current
 				}
 				if root.Kind == "claude" {
 					var msg struct {
@@ -392,6 +411,46 @@ func (r *LogReader) Scan(now time.Time) model.AI {
 		out.Quotas = append(out.Quotas, q)
 	}
 	return out
+}
+
+// Read names only. Tool input, arguments and content are never decoded.
+func logToolNames(kind string, event map[string]json.RawMessage) []string {
+	if kind == "claude" {
+		var message struct {
+			Content []struct {
+				Type string `json:"type"`
+				Name string `json:"name"`
+			} `json:"content"`
+		}
+		json.Unmarshal(event["message"], &message)
+		var names []string
+		for _, item := range message.Content {
+			if item.Type == "tool_use" && item.Name != "" {
+				names = append(names, item.Name)
+			}
+		}
+		return names
+	}
+	var envelope struct {
+		Type    string `json:"type"`
+		Payload struct {
+			Type     string `json:"type"`
+			Name     string `json:"name"`
+			ToolName string `json:"tool_name"`
+		} `json:"payload"`
+	}
+	json.Unmarshal(event["type"], &envelope.Type)
+	json.Unmarshal(event["payload"], &envelope.Payload)
+	if envelope.Type != "response_item" || envelope.Payload.Type != "function_call" && envelope.Payload.Type != "custom_tool_call" {
+		return nil
+	}
+	if envelope.Payload.Name != "" {
+		return []string{envelope.Payload.Name}
+	}
+	if envelope.Payload.ToolName != "" {
+		return []string{envelope.Payload.ToolName}
+	}
+	return nil
 }
 
 func boundedLine(r *bufio.Reader, budget int64) ([]byte, int64, bool, bool) {

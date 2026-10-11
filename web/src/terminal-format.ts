@@ -8,6 +8,13 @@ export function truncateName(name: string, max = 24): string {
   return chars.length > max ? chars.slice(0, max - 1).join("") + "…" : name;
 }
 
+export function editAge(minutes?: number): string {
+  if (minutes === undefined || minutes < 0 || !Number.isFinite(minutes)) return "-";
+  if (minutes < 60) return `${Math.floor(minutes)}m`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}h`;
+  return `${Math.floor(minutes / 1440)}d`;
+}
+
 export function truncateSessionLabel(label: string, max = 24): string {
   const parts = label.split(" · ");
   if (parts.length < 2 || Array.from(label).length <= max) return label;
@@ -20,6 +27,7 @@ export function truncateSessionLabel(label: string, max = 24): string {
 }
 
 export function attentionLabel(row: Result): string {
+  if (row.name.startsWith("agent_loop:")) return row.detail;
   const count = row.values?.count ?? 0;
   const fr = activeLanguage() === "fr";
   if (row.name.startsWith("recent_error:")) return fr ? `erreurs du journal : ${row.fields?.unit || "autres"} · ${count} en 24 h` : `journal errors: ${row.fields?.unit || "other"} · ${count} in 24 h`;
