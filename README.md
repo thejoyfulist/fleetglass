@@ -1,54 +1,40 @@
-# Fleetglass
+<div align="center">
+  <picture><source media="(prefers-color-scheme: dark)" srcset="assets/brand/mark-mono-dark.svg"><img src="assets/brand/mark-mono-light.svg" alt="Fleetglass mark" width="64" height="64"></picture>
+  <h1>Fleetglass</h1>
+  <p>One cockpit for your server and the AI agents running on it.</p>
+  <p>
+    <a href="https://github.com/thejoyfulist/fleetglass/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/thejoyfulist/fleetglass/ci.yml?style=flat-square&label=CI&color=555555"></a>
+    <a href="https://github.com/thejoyfulist/fleetglass/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/thejoyfulist/fleetglass?style=flat-square&color=555555"></a>
+    <a href="LICENSE"><img alt="AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-555555?style=flat-square"></a>
+    <a href="go.mod"><img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-555555?style=flat-square"></a>
+    <a href="docs/INSTALL.md"><img alt="Linux amd64 and arm64" src="https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-555555?style=flat-square"></a>
+  </p>
+  <p><a href="#install">Install</a> · <a href="#features">Features</a> · <a href="#connect-your-agents">Connect agents</a> · <a href="#ask-it-from-your-agents-mcp">MCP</a> · <a href="#docs">Docs</a></p>
+</div>
 
-**See which AI agent is using your server, what it costs, and what changed around it.** Fleetglass is a self-hosted, read-only cockpit for Linux servers running Claude Code and Codex. It connects agent sessions and projects to processes, CPU, memory, token usage and quotas alongside machine and service monitoring. Your data stays on your own server.
+![Animated Fleetglass cockpit with synthetic agent and server data](assets/screenshots/demo.gif)
 
-The cockpit uses a monochrome macOS Terminal palette, text tables, block bars, cyan warnings and magenta critical states. Keyboard shortcuts switch views (`1`–`9`), cycle the range (`r`), search (`/`), and switch theme (`t`). English is the first-visit default; French is available in Settings.
+*Screenshots and demo use only the synthetic `demo-01`, `atlas`, `orbit`, and `ledger` fixture. [Watch the short demo](assets/screenshots/demo.mp4).*
 
-![Light-theme Overview showing three active AI agents, healthy services and one certificate to watch](assets/screenshots/overview-light.png)
+## Why Fleetglass
 
-*All screenshots below use synthetic data from the `demo-01` fixture. No real host or account data is shown.*
+- See which agent session and project is using CPU and memory, alongside token pace, model cost estimates, and subscription quotas.
+- Check machine health, services, containers, projects, probes, and recent changes on one screen.
+- Keep observations private: loopback listeners by default, local storage, and read-only host access.
 
-<details>
-<summary>See the dark theme and mobile layout</summary>
+## Install
 
-![Dark-theme Overview with the same synthetic host data](assets/screenshots/overview-dark.png)
+Linux amd64/arm64 with systemd. Review [the installer](install.sh) before running it:
 
-<img src="assets/screenshots/overview-mobile.png" width="390" alt="Mobile Overview showing agent activity, quotas and server health on the synthetic host">
+```sh
+curl -fsSL https://raw.githubusercontent.com/thejoyfulist/fleetglass/main/install.sh | sudo sh
+```
 
-</details>
+Preview the actions with `curl -fsSL https://raw.githubusercontent.com/thejoyfulist/fleetglass/main/install.sh | sudo sh -s -- --dry-run`. To pin a release, set `FLEETGLASS_VERSION=vX.Y.Z` in the root environment; see [install and upgrade](docs/INSTALL.md).
 
-## One cockpit for the machine and its agents
+<details><summary>Manual verified install</summary>
 
-- **AI sessions in context:** live Claude Code and Codex sessions, readable metadata-only names, process trees, worktrees, token pace, quota forecasts, request speed and cost by project or model. OTLP is the primary feed; opt-in local logs are a fallback.
-- **A name behind each number:** app groups by unit, container and agent session; CPU, memory, disk and measured container network; project dev servers, storage map and fixed-rule insights.
-- **Server health:** CPU, memory, disks, SMART, RAPL energy, network, GPU when present, Docker, systemd, listening ports, TLS, updates, journal errors, backups and changes.
-- **Availability across a fleet:** external and internal probes, 30-day history, a minimal public status page and per-host tokens for remote agents.
-- **A private, installable cockpit:** live SSE updates, English and French, light and dark themes, phone layout, offline shell, read-only Prometheus export and an optional read-only MCP endpoint. No action can restart or change your host.
-
-![Agents view showing three synthetic Claude Code and Codex sessions](assets/screenshots/agents-light.png)
-
-![Session detail for a synthetic agent](assets/screenshots/agents-detail-light.png)
-
-![Apps view grouping synthetic containers and agent sessions by resource use](assets/screenshots/apps-light.png)
-
-![Projects view showing the synthetic atlas, orbit and ledger development servers](assets/screenshots/projects-light.png)
-
-<details>
-<summary>See these views in the dark theme</summary>
-
-![Dark-theme Agents view with synthetic sessions](assets/screenshots/agents-dark.png)
-
-![Dark-theme Apps view with synthetic resource groups](assets/screenshots/apps-dark.png)
-
-![Dark-theme Projects view with synthetic development servers](assets/screenshots/projects-dark.png)
-
-</details>
-
-**On the roadmap:** alert delivery and incident workflows, including acknowledgement, snooze and maintenance windows. The current cockpit shows observed issues; it does not send alerts.
-
-## Quick start
-
-Download a Linux amd64 or arm64 release bundle and its top-level `SHA256SUMS` from a release, then:
+Download the Linux archive and `SHA256SUMS` from the same [release](https://github.com/thejoyfulist/fleetglass/releases), then run:
 
 ```sh
 sha256sum -c SHA256SUMS
@@ -58,21 +44,111 @@ sudo sh deploy/install.sh --dry-run
 sudo sh deploy/install.sh
 ```
 
-Open `http://127.0.0.1:7878` on the machine, or use a private tunnel. The installer verifies the bundled binaries, creates a non-root account, detects local Docker sockets, SMART devices and relevant units, and starts the three systemd services. It never opens a network port. For upgrades, use `sudo sh deploy/install.sh --upgrade` from a new bundle. See [install and upgrade](docs/INSTALL.md) before deploying.
+</details>
 
-## Privacy and access
+Open the cockpit at **http://127.0.0.1:7878** on the server. For private access from your laptop or phone, [Tailscale Serve](docs/EXPOSURE.md) can expose it only within your tailnet:
 
-Fleetglass sends no telemetry. The optional release check is off by default. The agent never changes host state; the small root helper has a fixed read allowlist. The server keeps data in local SQLite, and you can create consistent online backups. OTLP input is filtered to measurements and approved metadata, excluding prompts, credentials, command lines, MAC addresses and serial numbers. The cockpit binds to loopback by default, while remote agents require HTTPS and their own token.
+```sh
+sudo tailscale serve --bg --https=8443 http://127.0.0.1:7878
+```
 
-## Documentation
+## Connect your agents
 
-- [Install and upgrade](docs/INSTALL.md) · [Configuration](docs/CONFIGURATION.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Security and privacy](docs/SECURITY.md) · [Database backup and restore](docs/BACKUP.md) · [Safe cockpit exposure](docs/EXPOSURE.md)
-- [AI agent setup](docs/AI-AGENTS.md) · [Multi-server setup](docs/MULTI-SERVER.md) · [MCP setup](docs/MCP.md) · [Prometheus and operations](docs/M9D-OPERATIONS.md)
-- [Product scope](docs/PRODUCT.md) · [Changelog](docs/CHANGELOG.md)
+Fleetglass receives OTLP/HTTP metrics and logs on `127.0.0.1:4318`. For Claude Code, add this `env` block to `~/.claude/settings.json` (merge it with existing settings):
 
-## Build from source
+```json
+{
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:4318"
+  }
+}
+```
 
-Go 1.26 and Node 24 are used. The committed `web/dist` is embedded in the server, so a normal Go build needs no Node runtime. For UI changes, run `npm ci`, `npm test` and `npm run build` in `web/`, then commit the updated `dist`. Run `go test ./...` and `go vet ./...` at the repository root. `./scripts/release.sh /path/to/output` produces deterministic Linux amd64 and arm64 tarballs with SHA-256 checksums. It derives release versions from `vMAJOR.MINOR.PATCH` git tags; untagged builds are marked as development builds.
+For Codex, add to `~/.codex/config.toml`:
+
+```toml
+[otel]
+log_user_prompt = false
+exporter = { "otlp-http" = { endpoint = "http://127.0.0.1:4318/v1/logs", protocol = "binary" } }
+metrics_exporter = { "otlp-http" = { endpoint = "http://127.0.0.1:4318/v1/metrics", protocol = "binary" } }
+```
+
+See [agent setup](docs/AI-AGENTS.md) for attribution, local log fallback, and quota limits.
+
+## Features
+
+| View | What it shows | Synthetic preview |
+| --- | --- | --- |
+| Agents | Sessions, token speed, cost by model and project, quotas with pace | <img src="assets/screenshots/agents-dark.png" width="220" alt="Synthetic agents view"> |
+| Server | CPU, temperature, storage, energy, network | <img src="assets/screenshots/overview-dark.png" width="220" alt="Synthetic server overview"> |
+| Services & uptime | systemd, containers, probes, TLS | <img src="assets/screenshots/overview-dark.png" width="220" alt="Synthetic server overview"> |
+| Projects | Development servers, ports, worktrees, idle processes | <img src="assets/screenshots/projects-dark.png" width="220" alt="Synthetic projects view"> |
+| Changes & security | Updates, journal errors, backups, recent changes | <img src="assets/screenshots/overview-dark.png" width="220" alt="Synthetic server overview"> |
+
+Keyboard shortcuts: `1`–`9` views, `r` range, `/` search, `t` theme. The cockpit has light and dark themes and a mobile layout. [See the full screenshot set](assets/screenshots/).
+
+## Ask it from your agents (MCP)
+
+The read-only MCP endpoint is **off by default**. After [enabling its separate loopback listener and private token](docs/MCP.md), connect Claude Code with a private `.mcp.json`:
+
+```json
+{"mcpServers":{"fleetglass":{"type":"http","url":"http://127.0.0.1:7879/mcp","headers":{"Authorization":"Bearer ${FLEETGLASS_MCP_TOKEN}"}}}}
+```
+
+Or add to your private Codex `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.fleetglass]
+url = "http://127.0.0.1:7879/mcp"
+bearer_token_env_var = "FLEETGLASS_MCP_TOKEN"
+```
+
+Load `FLEETGLASS_MCP_TOKEN` into the CLI's environment from its private token file. The four tools are `what_is_running`, `figure_attribution`, `what_is_on_port`, and `host_status`.
+
+## Privacy & security
+
+- No product telemetry is sent to the maintainers. The optional release check is off by default.
+- Cockpit and OTLP bind to loopback by default; remote agent connections require HTTPS and a token.
+- The agent runs without root; a small root helper has a fixed read allowlist.
+- Prompts are filtered from ingestion and never stored. See the [security model](docs/SECURITY.md).
+
+## How it compares
+
+This is a comparison of **focus**, not a feature audit of other projects. “—” means no claim here.
+
+| Focus | Agent sessions tied to processes | AI cost & quotas | Server health | Uptime probes | Self-hosted | MCP |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Fleetglass | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| General monitors (Netdata, Glances, btop/htop, Beszel) | — | — | ✓ | — | ✓ | — |
+| Uptime Kuma | — | — | — | ✓ | ✓ | — |
+| AI usage CLIs (ccusage-style) | — | Cost focus | — | — | — | — |
+
+## Roadmap
+
+Alert delivery and incident workflows (ntfy, Telegram, email), then broader agent support. [Product scope](docs/PRODUCT.md) distinguishes what ships today from planned work.
+
+## FAQ
+
+**Does it send data?** No product telemetry is sent to the maintainers. Agents send measurements to the Fleetglass server you configure; optional update checks are off by default.
+
+**Can it stop my agents?** No. Fleetglass only observes; it does not restart or kill processes.
+
+**Does it work without Claude or Codex?** Yes. Machine, service, project, and uptime monitoring work independently.
+
+**Multiple servers?** Yes. Enroll remote agents with HTTPS and per-host tokens; see [multi-server setup](docs/MULTI-SERVER.md).
+
+## Docs
+
+[Install](docs/INSTALL.md) · [Configuration](docs/CONFIGURATION.md) · [Agent setup](docs/AI-AGENTS.md) · [MCP](docs/MCP.md) · [Security](docs/SECURITY.md) · [Operations](docs/OPERATIONS.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) · [Changelog](docs/CHANGELOG.md)
+
+## Contributing
+
+Build and test instructions are in [CONTRIBUTING.md](CONTRIBUTING.md). Please use synthetic fixtures for screenshots and bug reports. [Report a vulnerability privately](SECURITY.md).
+
+## License
 
 Fleetglass is licensed under [AGPL-3.0](LICENSE).

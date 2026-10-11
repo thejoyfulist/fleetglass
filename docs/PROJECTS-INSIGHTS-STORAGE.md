@@ -1,4 +1,4 @@
-# Projects, fixed insights, heat, and storage (M9b)
+# Projects, fixed insights, heat, and storage
 
 ## Configuration and access
 

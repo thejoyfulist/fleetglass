@@ -1,4 +1,4 @@
-# Milestone 9d operations
+# Operations
 
 ## Prometheus
 

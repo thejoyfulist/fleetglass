@@ -19,6 +19,8 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: go test ./...
       - run: go vet ./...
+      - run: sh -n install.sh scripts/test-installer.sh && sh scripts/test-installer.sh
+      - run: python3 scripts/check-links.py
       - run: npm ci
         working-directory: web
       - run: npm test

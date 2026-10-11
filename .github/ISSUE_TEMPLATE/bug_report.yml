@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible Fleetglass problem (use private advisories for security issues)
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Use synthetic or redacted data only. Do not include tokens, prompts, host identifiers, serial numbers, or MAC addresses."
+  - type: input
+    id: version
+    attributes:
+      label: Fleetglass version
+      description: Output of fleetglass-server --version
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Agent, Server, Web cockpit, Installer, Documentation, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
