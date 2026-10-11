@@ -1320,6 +1320,13 @@ body{background:var(--ground);font:12.5px/1.5 var(--mono);padding:20px 16px 40px
 .terminal-data-table th,.terminal-data-table td{overflow:hidden;text-overflow:ellipsis}
 .terminal-data-table td.terminal-name-cell{max-width:24ch}
 .terminal-data-table td.numeric{overflow:visible;text-overflow:clip}
+.terminal-network .terminal-data-table{table-layout:fixed;width:100%}
+.terminal-network .terminal-data-table th,.terminal-network .terminal-data-table td{padding-right:1ch!important}
+.terminal-network .terminal-data-table td.numeric{white-space:nowrap}
+.terminal-network .terminal-pair{white-space:normal;flex-wrap:wrap;gap:0 1ch}
+.terminal-network .terminal-pair>span:last-child{min-width:0;overflow-wrap:anywhere}
+.terminal-network .terminal-link{margin:.25em 0}
+.quota-hint{white-space:normal;overflow-wrap:anywhere;margin-top:.4em}
 .terminal-speed-line{white-space:normal;overflow-wrap:anywhere}
 .terminal-issue{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Keep the terminal controls visible while the document scrolls. */

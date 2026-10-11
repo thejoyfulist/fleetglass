@@ -69,6 +69,7 @@ describe("formatting", () => {
     const session = {id:"abcdef123456",kind:"claude",project:"unmatched",worktree:"/tmp/coordination",at:"",state:"working",reason:"",source:"log"};
     expect(sessionProject(session)).toBe("—");
     expect(sessionDisplayLabel(session)).toBe("claude · coordination · abcdef12");
+    expect(sessionDisplayLabel({...session,worktree:"",model:"claude-opus-4"})).toBe("claude · abcdef12");
   });
 });
 describe("observation titles", () => {
@@ -127,8 +128,8 @@ describe("quotas", () => {
   it("uses human-readable labels and consistent whole percentages", () => {
     expect(agentName("codex")).toBe("Codex");
     expect(agentState("waiting-for-input")).toBe("Waiting for input");
-    expect(quotaWindow("secondary")).toBe("7-day window");
-    expect(quotaWindow("primary")).toBe("5-hour window");
+    expect(quotaWindow("secondary")).toBe("7 days");
+    expect(quotaWindow("primary")).toBe("5 hours");
     expect(quotaMethod("cli_reported", "codex")).toBe("reported by Codex");
     expect(formatQuotaPercent(72.6)).toBe("73%");
     expect(resetTime("2026-10-14T15:44:23Z")).toMatch(
@@ -166,10 +167,12 @@ describe("quotas", () => {
       resets_at: "2026-10-08T17:28:38Z",
     };
     expect(quotaWindow(weekly.window, weekly.window_minutes)).toBe(
-      "7-day window",
+      "7 days",
     );
+    expect(quotaWindow("primary", 720)).toBe("12 h");
+    expect(quotaWindow("primary", 2880)).toBe("2 d");
     expect(quotaWindow(fiveHour.window, fiveHour.window_minutes)).toBe(
-      "5-hour window",
+      "5 hours",
     );
     expect(pace(weekly)).toBeGreaterThan(10);
     expect(pace(weekly)).toBeLessThan(20);

@@ -39,8 +39,10 @@ export interface Session {
 }
 export function sessionProject(session: Session): string { return session.project && session.project !== "unmatched" ? session.project : "—"; }
 export function sessionDisplayLabel(session: Session): string {
-  if (session.project !== "unmatched") return session.label || session.id.slice(0,16);
-  return `${session.kind} · ${session.worktree?.split("/").at(-1) || "session"} · ${session.id.slice(0,8)}`;
+  const location = session.worktree?.split("/").filter(Boolean).at(-1) ||
+    (session.project && session.project !== "unmatched" ? session.project.split("/").filter(Boolean).at(-1) : "");
+  if (location && session.project !== "unmatched") return session.label || `${session.kind} · ${location} · ${session.id.slice(0,8)}`;
+  return [session.kind, location, session.id.slice(0,8)].filter(Boolean).join(" · ");
 }
 export interface Money { original:number; currency:string; converted:number|null; display_currency:string; rate?:number; rate_source?:string; rate_date?:string }
 export interface SessionDetail {session:Session;tokens:Tokens;usage_measured:boolean;tokens_per_minute:number;api_equivalent_usd:number;cli_reported_usd:number;api_money?:Money;cli_money?:Money;unpriced_tokens:number;processes:ProjectProcess[];speed:SpeedSummary[]}
@@ -405,7 +407,11 @@ export function agentSource(source: string) {
 export function quotaWindow(window: string, minutes?: number) {
   if (minutes === 300) return t("quota.five_hour");
   if (minutes === 10080) return t("quota.seven_day");
-  if (minutes && minutes > 0) return t("quota.minutes", {minutes});
+  if (minutes && minutes > 0) {
+    if (minutes % 1440 === 0) return t("quota.days", {days:minutes / 1440});
+    if (minutes % 60 === 0) return t("quota.hours", {hours:minutes / 60});
+    return t("quota.minutes", {minutes});
+  }
   if (window === "secondary" || window === "week" || window.includes("7")) return t("quota.seven_day");
   if (window === "primary" || window.includes("5")) return t("quota.five_hour");
   return window;

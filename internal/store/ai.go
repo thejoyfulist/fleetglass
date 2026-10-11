@@ -112,19 +112,22 @@ func (s *Store) Agents(host string) ([]model.AgentSession, error) {
 
 func SessionLabel(v model.AgentSession) string {
 	location := v.Worktree
-	if location == "" {
+	if location == "" || location == "/" || location == "unmatched" {
 		location = v.Project
 	}
 	location = filepath.Base(strings.TrimRight(location, "/"))
-	if location == "." || location == "/" || location == "" {
-		location = "session"
+	if location == "." || location == "/" || location == "" || location == "unmatched" {
+		location = ""
 	}
 	short := v.ID
 	if len(short) > 8 {
 		short = short[:8]
 	}
-	label := v.Kind + " · " + location
-	if v.Branch != "" {
+	label := v.Kind
+	if location != "" {
+		label += " · " + location
+	}
+	if v.Branch != "" && location != "" {
 		label += " · " + v.Branch
 	}
 	return label + " · " + short

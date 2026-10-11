@@ -82,6 +82,12 @@ func TestCostsByModelAndSessionSummary(t *testing.T) {
 	if label := SessionLabel(model.AgentSession{ID: id, Kind: "codex", Project: "atlas", Worktree: "/tmp/orbit", Branch: "feature/preview"}); label != "codex · orbit · feature/preview · aaaaaaaa" {
 		t.Fatalf("metadata label: %s", label)
 	}
+	if label := SessionLabel(model.AgentSession{ID: "0b82eee0abcd", Kind: "claude"}); label != "claude · 0b82eee0" {
+		t.Fatalf("unknown location label: %s", label)
+	}
+	if label := SessionLabel(model.AgentSession{ID: "0b82eee0abcd", Kind: "claude", Worktree: "/", Project: "atlas"}); label != "claude · atlas · 0b82eee0" {
+		t.Fatalf("project fallback label: %s", label)
+	}
 }
 
 func TestAgentsSummaryUsesSessionIndex(t *testing.T) {

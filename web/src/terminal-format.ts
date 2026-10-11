@@ -8,6 +8,17 @@ export function truncateName(name: string, max = 24): string {
   return chars.length > max ? chars.slice(0, max - 1).join("") + "…" : name;
 }
 
+export function truncateSessionLabel(label: string, max = 24): string {
+  const parts = label.split(" · ");
+  if (parts.length < 2 || Array.from(label).length <= max) return label;
+  const prefix = parts[0] + " · ";
+  const suffix = " · " + parts.at(-1);
+  const available = max - Array.from(prefix + suffix).length;
+  if (available <= 1) return parts[0] + suffix;
+  const middle = parts.slice(1, -1).join(" · ");
+  return Array.from(middle).length > available ? prefix + Array.from(middle).slice(0, available - 1).join("") + "…" + suffix : label;
+}
+
 export function attentionLabel(row: Result): string {
   const count = row.values?.count ?? 0;
   const fr = activeLanguage() === "fr";

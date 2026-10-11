@@ -18,6 +18,17 @@ fixture.AGENTS[0]["api_money"] = RATE
 fixture.AGENTS[0]["project"] = "unmatched"
 fixture.AGENTS[0]["worktree"] = "coordination"
 fixture.AGENTS[0]["label"] = "claude · unmatched · demo-1"
+fixture.AGENTS[2].update({"id": "0b82eee0abcd", "kind": "claude", "project": "unmatched",
+                          "worktree": "", "label": "claude · session · 0b82eee0", "model": "claude-opus-4-1"})
+fixture.QUOTAS[:] = [{"kind": "codex", "window": "primary", "window_minutes": 10080,
+                      "used_percent": 42, "resets_at": fixture.iso(4 * 86400),
+                      "observed_at": fixture.iso(), "method": "cli_reported"}]
+fixture.SUBSCRIPTIONS[0]["subscription_usd"] = 20
+fixture.RESULTS.extend(fixture.result(f"network:{name}", {"rx_bytes_per_second": 4096-i*300,
+                       "tx_bytes_per_second": 1024+i*100, "rx_bytes": 10**9,
+                       "tx_bytes": 10**8}) for i,name in enumerate(
+                       ("tailscale0", "docker0", "veth123456789abcdef", "veth987654321fedcba",
+                        "br-123456789abcdef", "enp123s456f789verylong", "wg0", "eth1")))
 fixture.APPS[0]["name"] = "Claude session · coordination · abcdef12"
 fixture.APPS[1]["name"] = "Container synthetic-worker-12345678"
 fixture.APPS[-1]["name"] = "Other / not attributed"
@@ -135,14 +146,28 @@ def main():
                         if 'idle-model' in content or content.count('gpt-6-sol:')>1: errors.append(f"{theme}: speed includes idle or duplicate models")
                         if 'ECB rate' in page.locator('table').all_inner_texts().__str__(): errors.append(f"{theme}: rate repeated in table cells")
                         if 'unmatched' in page.get_by_role('region',name='AI agents').inner_text(): errors.append(f"{theme}: unmatched session label")
+                        agents_text=page.get_by_role('region',name='AI agents').inner_text()
+                        if 'session · 0b82' in agents_text or '0b82eee0' not in agents_text: errors.append(f"{theme}: unknown-location session ID clipped")
+                        network_text=page.get_by_role('region',name='Network').inner_text()
+                        if 'containers (' not in network_text or 'more' not in network_text: errors.append(f"{theme}: network grouping or overflow link missing")
+                        if page.get_by_role('region',name='Network').evaluate("e => {const b=e.querySelector('.terminal-box-body');return b.scrollWidth>b.clientWidth+1 || [...e.querySelectorAll('td.numeric')].some(c=>c.scrollWidth>c.clientWidth+1)}"):
+                            errors.append(f"{theme}: Network clipping at 1440")
+                        if 'Claude · not reported' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: missing Claude quota invented or hidden")
+                        if '7 days' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: weekly primary quota mislabelled")
                         if '0.0.0-dev' in status or '93f9731' not in status: errors.append(f"{theme}: dev commit missing")
                     if view=="costs":
+                        if 'Claude · not reported' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: Costs quota status missing")
                         if 'ECB rate' in str(page.locator('table').all_inner_texts()): errors.append(f"{theme}: Costs table repeats conversion source")
                         if page.locator('main').inner_text().count('EUR at ECB rate Oct 9') != 1: errors.append(f"{theme}: Costs conversion source is not shown once")
                     errors.extend(f"{view}-{theme}: {e}" for e in inspect(page,1440))
+                    if view=="agents" and 'Claude · not reported' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: Agents quota status missing")
                     page.screenshot(path=str(OUT/f"{view}-{theme}.png"),full_page=True)
                     if view in ("overview", "agents"):
                         errors.extend(f"{view}-{theme}-desktop: {e}" for e in inspect_sticky_tabs(page))
+                    if view=="overview":
+                        page.get_by_role('region',name='Network').locator('button.terminal-link').click()
+                        if not page.url.endswith('/machine?section=Network') or page.get_by_role('button',name='Network',exact=True).first.get_attribute('aria-pressed')!='true':
+                            errors.append(f"{theme}: Network more link did not open Network view")
                     if view=="machine":
                         for section in SECTIONS:
                             page.get_by_role('button',name=section,exact=True).first.click()

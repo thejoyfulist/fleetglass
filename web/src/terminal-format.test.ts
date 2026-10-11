@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {attentionLabel, blockBar, formatTextTable, measuredSpeed, truncateName} from "./terminal-format";
+import {attentionLabel, blockBar, formatTextTable, measuredSpeed, truncateName, truncateSessionLabel} from "./terminal-format";
 
 describe("terminal text rendering", () => {
   it("aligns columns and preserves markup tones", () => {
@@ -21,6 +21,11 @@ describe("terminal text rendering", () => {
     expect(truncateName("Other / not attributed", 12)).toBe("Other / not…");
     expect(truncateName("short", 12)).toBe("short");
     expect(truncateName("🚀🚀🚀", 2)).toBe("🚀…");
+  });
+  it("preserves the short session ID while shortening only the middle", () => {
+    expect(truncateSessionLabel("claude · session · 0b82eee0")).toBe("claude · ses… · 0b82eee0");
+    expect(truncateSessionLabel("claude · 0b82eee0")).toBe("claude · 0b82eee0");
+    expect(truncateSessionLabel("codex · very-long-project · branch-name · abcdef12").endsWith(" · abcdef12")).toBe(true);
   });
   it("names attention families from structured fields", () => {
     expect(attentionLabel({name:"recent_error:0",state:"warn",detail:"journal error group",values:{count:2},fields:{unit:"demo.service"}})).toBe("journal errors: demo.service · 2 in 24 h");

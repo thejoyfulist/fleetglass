@@ -77,6 +77,7 @@ import { defaultPreferences, hasPreferences, readPreferences, savePreferences, u
 import type { Preferences } from "./preferences";
 import { activeLanguage, choiceLabel, navigationLabels, plural, sectionLabels, setLanguage, t as message } from "./i18n";
 import { TerminalOverview, TerminalTable, TerminalFilter, TerminalKV, TerminalBar } from "./terminal";
+import { truncateSessionLabel } from "./terminal-format";
 import type { MessageKey } from "./i18n";
 import "./tokens.css";
 import "./style.css";
@@ -546,7 +547,8 @@ function AgentTable({
                 ]
           }
           rows={agents.map((a) => {
-            const first = <button type="button" className="terminal-link" onClick={()=>choose(a.id)}>{sessionDisplayLabel(a)}</button>;
+            const label = sessionDisplayLabel(a);
+            const first = <button type="button" className="terminal-link" title={label} onClick={()=>choose(a.id)}>{truncateSessionLabel(label)}</button>;
             return compact
               ? [
                   first,
@@ -590,20 +592,20 @@ function AgentTable({
     </>
   );
 }
-function Quotas({ quotas }: { quotas: Quota[] }) {
-  if (!quotas.length) return <Empty>{t("ui.no.quota.observations.reported.42bea")}</Empty>;
+function Quotas({ quotas, subscriptions }: { quotas: Quota[]; subscriptions: SubscriptionComparison[] }) {
+  const missing = subscriptions.filter(s => (s.subscription_amount != null || s.subscription_usd !== null) && !quotas.some(q => q.kind === s.kind));
+  if (!quotas.length && !missing.length) return <Empty>{t("ui.no.quota.observations.reported.42bea")}</Empty>;
   const windowMinutes=(x:Quota)=>x.window_minutes||((x.window==="week"||x.window==="secondary")?10080:300);
-  const q = quotas[0],
-    p = pace(q);
+  const q = quotas[0];
   return (
     <div className="qwrap">
-      <Gauge
+      {q?<Gauge
         used={q.used_percent}
-        paceValue={p}
+        paceValue={pace(q)}
         label={`${agentName(q.kind)}, ${quotaWindow(q.window, q.window_minutes)}`}
-      />
+      />:null}
       <div className="qlist">
-        <p className="quota-advice">{["codex","claude"].map(kind=>quotas.filter(x=>x.kind===kind).sort((a,b)=>windowMinutes(b)-windowMinutes(a))[0]).filter((x):x is Quota=>Boolean(x)).map(x=>hasDate(x.projected_at)?t(x.used_percent>pace(x)+5?"quota.advice_ahead":"quota.room",{agent:agentName(x.kind),window:quotaWindow(x.window,x.window_minutes),used:formatQuotaPercent(x.used_percent),projected:resetTime(x.projected_at)}):t("quota.no_projection",{agent:agentName(x.kind),window:quotaWindow(x.window,x.window_minutes),used:formatQuotaPercent(x.used_percent),pace:quotaLabel(x)})).join(" · ")}</p>
+        {quotas.length?<p className="quota-advice">{["codex","claude"].map(kind=>quotas.filter(x=>x.kind===kind).sort((a,b)=>windowMinutes(b)-windowMinutes(a))[0]).filter((x):x is Quota=>Boolean(x)).map(x=>hasDate(x.projected_at)?t(x.used_percent>pace(x)+5?"quota.advice_ahead":"quota.room",{agent:agentName(x.kind),window:quotaWindow(x.window,x.window_minutes),used:formatQuotaPercent(x.used_percent),projected:resetTime(x.projected_at)}):t("quota.no_projection",{agent:agentName(x.kind),window:quotaWindow(x.window,x.window_minutes),used:formatQuotaPercent(x.used_percent),pace:quotaLabel(x)})).join(" · ")}</p>:null}
         {quotas.map((x) => {
           const paceValue = pace(x);
           return (
@@ -635,6 +637,8 @@ function Quotas({ quotas }: { quotas: Quota[] }) {
             </div>
           );
         })}
+        {missing.map(s=><div className="qi terminal-dim" key={s.kind}>{t("quota.not_reported",{plan:agentName(s.kind)})}</div>)}
+        {missing.some(s=>s.kind==="claude")?<p className="quota-hint terminal-dim">{t("quota.claude_hint")}</p>:null}
       </div>
     </div>
   );
@@ -882,7 +886,7 @@ export function OverviewView({
         source={t("ui.pace.steady.use.until.reset.0fd4b")}
         className="quota"
       >
-        <Quotas quotas={data.quotas} />
+        <Quotas quotas={data.quotas} subscriptions={data.subscriptions} />
       </Tile>
       <Tile title={t("ui.cpu.and.package.power.688e3")} className="cpu" explanationKey="explain.cpu">
         <div className="chart-controls">
@@ -1040,6 +1044,7 @@ function AgentsView({ data }: { data: ReturnType<typeof useCockpit> }) {
           <AgentTable agents={filtered} usage={data.sessionUsage} host={data.host} />
         </Tile>
         <Tile title={t("speed.title")} source={t("speed.last_hour")} className="full"><SpeedPanel speed={data.speed} host={data.host}/></Tile>
+        <Tile title={t("ui.quotas.34ed5")} className="half"><Quotas quotas={data.quotas} subscriptions={data.subscriptions}/></Tile>
       </div>
     </>
   );
@@ -1057,7 +1062,7 @@ function MachineView({
   storage: boolean;
   onStorageChange: (storage: boolean) => void;
 }) {
-	const [machineSection,setMachineSection]=useState("Overview");
+	const [machineSection,setMachineSection]=useState(()=>new URLSearchParams(location.search).get("section")==="Network"?"Network":"Overview");
   const section = storage ? "Storage" : machineSection;
   const r = data.overview?.results || [],
     cpu = result(r, "cpu"),
@@ -1375,6 +1380,7 @@ function CostsView({
         <Tile title={t("subscription.title")} source={t("subscription.this_month")} className="full">
           <TerminalTable heads={[t("terminal.label_plan"),t("subscription.api_equivalent"),t("ui.month.cost.dedfe"),t("terminal.label_state")]} right={[1,2]} rows={data.subscriptions.map(s=>[agentName(s.kind),s.api_money?formatMoneyValue(s.api_money):formatMoney(s.api_equivalent_usd),s.subscription_usd===null?t("terminal.not_collected"):s.subscription_money?formatMoneyValue(s.subscription_money):formatMoney(s.subscription_amount??s.subscription_usd),s.coverage])}/>
         </Tile>
+        <Tile title={t("ui.quotas.34ed5")} className="half"><Quotas quotas={data.quotas} subscriptions={data.subscriptions}/></Tile>
         {data.energy?.month_seconds ? <Tile title={t("ui.energy.437bc")} source={t("ui.cpu.package.only.56d4b")} className="half">
           <div className="stat-grid"><div><span>{t("ui.today.24345")}</span><b>{formatNumber(data.energy.today_kwh, 3)} {" "}{t("ui.kwh.72c28")}</b></div><div><span>{t("ui.this.month.1b478")}</span><b>{formatNumber(data.energy.month_kwh, 3)} {" "}{t("ui.kwh.72c28")}</b></div><div><span>{t("ui.today.cost.193fc")}</span><MoneyStat money={data.energy.today_money} amount={data.energy.today_cost} currency={data.energy.currency}/></div><div><span>{t("ui.month.cost.dedfe")}</span><MoneyStat money={data.energy.month_money} amount={data.energy.month_cost} currency={data.energy.currency}/></div></div>
           <p className="foot">{t("ui.at.08550")}{" "}{(data.energy.price_money ? formatMoneyValue(data.energy.price_money) : formatMoney(data.energy.price_per_kwh,data.energy.currency))}{t("ui.kwh.observed.intervals.only.cpu.package.only.not.148fe")}</p>

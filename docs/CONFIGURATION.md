@@ -49,7 +49,7 @@ All fields are optional unless noted. Fleetglass reads one JSON file for the ser
 | `display_currency` | `USD` | Default cockpit cost currency. Each browser can choose USD or EUR in Display settings. |
 | `exchange_rates` | absent | Optional static rates: `{"date":"2026-10-08","rates":{"USD":1.16,"GBP":0.87}}`. Rates are currency units per EUR; EUR is always 1. No network access is needed. |
 | `exchange_rate_source` | empty/off | `ecb` enables one daily request to the public ECB XML feed, with a four-second timeout and SQLite cache. The latest cached rates remain available if a request fails. |
-| `claude_budget_5h`, `claude_budget_week` | `0` | Optional estimated Claude token budgets. |
+| `claude_budget_5h`, `claude_budget_week` | `0` | Optional user estimates of Claude token budgets for 5-hour and weekly windows. Claude Code does not report subscription quota usage; Fleetglass estimates percentages only when these budgets are configured. Zero leaves quota unreported. |
 | `display_defaults` | English, Celsius, bytes, per-core CPU | `{language: "en" or "fr", temperature: "C" or "F", network: "bytes" or "bits", cpu: "core" or "machine"}`. |
 | `backup_dir` | empty/off | Absolute directory for one online database backup per UTC day. |
 | `backup_retention_days` | `0` | Positive number required when `backup_dir` is set. Only Fleetglass-named daily files are pruned. |

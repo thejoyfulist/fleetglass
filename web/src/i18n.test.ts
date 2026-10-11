@@ -44,7 +44,7 @@ describe("message catalog", () => {
     expect(resultDetail({name:"tls:example.test",state:"warn",detail:"expires in 20.7 days",detail_code:"certificate_expires",values:{days_remaining:20.7}})).toBe("Expire dans 21 jours");
     expect(resultDetail({name:"container:local:web",state:"ok",detail:"running; healthy",detail_code:"container_status",detail_params:{state:"running",health:"healthy"}})).toBe("en cours ; sain");
     expect(changeDetail({id:"x",at:"",type:"APT",text:"Upgraded 3 packages: curl",change_code:"apt_upgraded",change_params:{count:"3",packages:"curl"}})).toBe("3 paquets mis à jour : curl");
-    expect(quotaWindow("secondary")).toBe("fenêtre de 7 jours");
+    expect(quotaWindow("secondary")).toBe("7 jours");
     setLanguage("en");
   });
 });
