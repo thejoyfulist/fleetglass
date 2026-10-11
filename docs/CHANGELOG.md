@@ -4,6 +4,10 @@ All notable user-facing changes are documented here. This project follows [Keep 
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-12
+
+First public release.
+
 ### Added
 
 - A read-only cockpit for Linux server health, services, containers, projects, uptime, backups, security observations, and recent changes.
@@ -12,9 +16,8 @@ All notable user-facing changes are documented here. This project follows [Keep 
 - Light and dark terminal themes, keyboard shortcuts, English and French, a mobile layout, and an offline shell.
 - Verified Linux amd64/arm64 release bundles, an installer, and online SQLite backups.
 
-### Changed
-
-- Session labels, host facts, CPU frequency, DNS probes, and cost by model are easier to inspect in the cockpit.
+- Readable session labels, host facts, CPU frequency, DNS probes, and cost by model.
+- A one-line installer that verifies the release checksum before installing.
 
 ### Known limitations
 
