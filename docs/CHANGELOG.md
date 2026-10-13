@@ -7,6 +7,7 @@ All notable user-facing changes are documented here. This project follows [Keep 
 ### Fixed
 
 - Local MCP and tokenless OTLP reject non-loopback HTTP Host headers; privileged SMART output is bounded to 1 MiB.
+- Cockpit/API requests now enforce an explicit HTTP Host allowlist and same-host browser Origin; reverse proxies must declare their hostname in `allowed_hosts`.
 - Go builds now require 1.26.9, which includes the current standard-library security fixes.
 
 - Possible-loop warnings now use the observed tracking window, require recent token output, and recognize changes in attributed worktrees from cached Git scans.

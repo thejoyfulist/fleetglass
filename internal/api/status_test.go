@@ -32,7 +32,7 @@ func TestPublicStatusHasNoPrivateFields(t *testing.T) {
 		}
 	}{{"cockpit", a.Handler()}, {"separate", a.StatusHandler()}} {
 		w := httptest.NewRecorder()
-		h.handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/status", nil))
+		h.handler.ServeHTTP(w, localRequest("GET", "/api/v1/status", nil))
 		if w.Code != 200 {
 			t.Fatalf("%s: %d", h.name, w.Code)
 		}
@@ -45,7 +45,7 @@ func TestPublicStatusHasNoPrivateFields(t *testing.T) {
 	}
 	for _, path := range []string{"/api/v1/hosts", "/api/v1/hosts/internal-host/probes", "/"} {
 		w := httptest.NewRecorder()
-		a.StatusHandler().ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+		a.StatusHandler().ServeHTTP(w, localRequest("GET", path, nil))
 		if w.Code != 404 {
 			t.Fatalf("separate listener exposed %s: %d", path, w.Code)
 		}

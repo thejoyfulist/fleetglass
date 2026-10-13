@@ -30,13 +30,13 @@ func TestEmbeddedCockpit(t *testing.T) {
 		{"/", "text/html", "no-cache"}, {"/agents", "text/html", "no-cache"}, {"/costs", "text/html", "no-cache"}, {"/favicon.svg", "image/svg+xml", ""},
 	} {
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest("GET", tc.path, nil))
+		h.ServeHTTP(w, localRequest("GET", tc.path, nil))
 		if w.Code != 200 || !strings.Contains(w.Header().Get("Content-Type"), tc.content) || w.Header().Get("Cache-Control") != tc.cache {
 			t.Errorf("%s: %d %v", tc.path, w.Code, w.Header())
 		}
 	}
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+	h.ServeHTTP(w, localRequest("GET", "/", nil))
 	body := w.Body.String()
 	assets := regexp.MustCompile(`/assets/[^" ]+\.(?:js|css)`).FindAllString(body, -1)
 	if len(assets) != 2 {
@@ -44,7 +44,7 @@ func TestEmbeddedCockpit(t *testing.T) {
 	}
 	for _, asset := range assets {
 		w = httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest("GET", asset, nil))
+		h.ServeHTTP(w, localRequest("GET", asset, nil))
 		content := "javascript"
 		if strings.HasSuffix(asset, ".css") {
 			content = "text/css"
@@ -59,7 +59,7 @@ func TestReadSessionFlow(t *testing.T) {
 	a.ReadToken = fixture("read-token")
 	h := a.Handler()
 	req := func(method, path string, body []byte, c *http.Cookie) *httptest.ResponseRecorder {
-		r := httptest.NewRequest(method, path, bytes.NewReader(body))
+		r := localRequest(method, path, bytes.NewReader(body))
 		if c != nil {
 			r.AddCookie(c)
 		}
@@ -113,7 +113,7 @@ func TestReadSessionFlow(t *testing.T) {
 func TestLoopbackReadsStayOpen(t *testing.T) {
 	h := cockpitAPI(t).Handler()
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/hosts", nil))
+	h.ServeHTTP(w, localRequest("GET", "/api/v1/hosts", nil))
 	if w.Code != 200 {
 		t.Fatal(w.Code)
 	}
@@ -121,7 +121,7 @@ func TestLoopbackReadsStayOpen(t *testing.T) {
 func TestSecureSessionBehindHTTPS(t *testing.T) {
 	a := cockpitAPI(t)
 	a.ReadToken = fixture("read-token")
-	r := httptest.NewRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"read-token"}`))
+	r := localRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"read-token"}`))
 	r.Header.Set("X-Forwarded-Proto", "https")
 	w := httptest.NewRecorder()
 	a.Handler().ServeHTTP(w, r)
@@ -135,7 +135,7 @@ func TestSignInRateLimitByAddress(t *testing.T) {
 	a.ReadToken = fixture("read-token")
 	h := a.Handler()
 	for i := 0; i < maxLoginAttempts+1; i++ {
-		r := httptest.NewRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"wrong"}`))
+		r := localRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"wrong"}`))
 		r.RemoteAddr = "192.0.2.1:1234"
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
@@ -147,7 +147,7 @@ func TestSignInRateLimitByAddress(t *testing.T) {
 			t.Fatalf("attempt %d: got %d, want %d", i+1, w.Code, want)
 		}
 	}
-	r := httptest.NewRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"read-token"}`))
+	r := localRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"read-token"}`))
 	r.RemoteAddr = "192.0.2.2:9876"
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -157,7 +157,7 @@ func TestSignInRateLimitByAddress(t *testing.T) {
 	a.mu.Lock()
 	a.loginAttempts["192.0.2.1"] = []time.Time{time.Now().Add(-2 * loginWindow)}
 	a.mu.Unlock()
-	r = httptest.NewRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"read-token"}`))
+	r = localRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"read-token"}`))
 	r.RemoteAddr = "192.0.2.1:4567"
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -175,7 +175,7 @@ func TestSessionCapacityEvictsOldest(t *testing.T) {
 		a.sessions[fmt.Sprintf("session-%d", i)] = time.Now().Add(time.Hour + time.Duration(i)*time.Second)
 	}
 	a.mu.Unlock()
-	r := httptest.NewRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"read-token"}`))
+	r := localRequest("POST", "/api/v1/auth", strings.NewReader(`{"token":"read-token"}`))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	if w.Code != http.StatusNoContent {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/thejoyfulist/fleetglass/internal/model"
 	"github.com/thejoyfulist/fleetglass/internal/money"
+	"github.com/thejoyfulist/fleetglass/internal/netguard"
 )
 
 // JSON keeps configuration within the Go standard library and rejects unknown keys.
@@ -23,6 +24,7 @@ type Config struct {
 	Labels             map[string]string `json:"labels"`
 	ServerURL          string            `json:"server_url"`
 	Listen             string            `json:"listen"`
+	AllowedHosts       []string          `json:"allowed_hosts"`
 	Token              string            `json:"token"`
 	TokenFile          string            `json:"token_file"`
 	CAFile             string            `json:"ca_file"`
@@ -433,6 +435,11 @@ func Load(path string) (Config, error) {
 		host, _, err := net.SplitHostPort(c.StatusListen)
 		if err != nil || net.ParseIP(host) == nil || c.StatusListen == c.Listen || c.StatusListen == c.OTLPListen {
 			return c, fmt.Errorf("invalid status listener")
+		}
+	}
+	for _, host := range c.AllowedHosts {
+		if !netguard.ValidAllowedHost(host) {
+			return c, fmt.Errorf("invalid allowed host")
 		}
 	}
 	return c, nil

@@ -165,6 +165,29 @@ func TestReadAccessAddress(t *testing.T) {
 	}
 }
 
+func TestAllowedHostsConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name, value string
+		valid       bool
+	}{
+		{"bare name", `{"allowed_hosts":["cockpit.example"]}`, true},
+		{"name and port", `{"allowed_hosts":["cockpit.example:8444"]}`, true},
+		{"wildcard", `{"allowed_hosts":["*.example"]}`, false},
+		{"URL", `{"allowed_hosts":["https://cockpit.example"]}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			if err := os.WriteFile(path, []byte(tc.value), 0600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := Load(path)
+			if (err == nil) != tc.valid {
+				t.Fatalf("valid=%t: %v", tc.valid, err)
+			}
+		})
+	}
+}
+
 func TestRemoteAgentRequiresHTTPS(t *testing.T) {
 	for _, tc := range []struct {
 		url   string

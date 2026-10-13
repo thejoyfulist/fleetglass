@@ -5,6 +5,7 @@
   },
   "server_url": "http://127.0.0.1:7878",
   "listen": "127.0.0.1:7878",
+  "allowed_hosts": [],
   "token_file": "/etc/fleetglass/token",
   "ca_file": "",
   "buffer_dir": "/var/lib/fleetglass/buffer",

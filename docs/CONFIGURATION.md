@@ -8,6 +8,7 @@ All fields are optional unless noted. Fleetglass reads one JSON file for the ser
 | `labels` | `{}` | Fleet labels, e.g. `{"role":"build"}`. |
 | `server_url` | `http://127.0.0.1:7878` | Agent ingest URL; remote URLs require HTTPS. |
 | `listen` | `127.0.0.1:7878` | Private cockpit/API listener. Non-loopback requires a read token. |
+| `allowed_hosts` | `[]` | Additional exact HTTP Host names accepted by the cockpit/API, with optional port. Loopback IPs and `localhost` are always accepted. For a reverse proxy, add its public Host name, e.g. `"cockpit.example.test"` (any port) or `"cockpit.example.test:8444"` (only that port). Wildcards and URLs are rejected. |
 | `token` | empty | Legacy ingest token; prefer `token_file`. |
 | `token_file` | empty | Private ingest token path, e.g. `/etc/fleetglass/token`. |
 | `ca_file` | empty | Absolute custom CA path for HTTPS agent connection. |

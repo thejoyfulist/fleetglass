@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/thejoyfulist/fleetglass/internal/config"
 	"github.com/thejoyfulist/fleetglass/internal/model"
 	"github.com/thejoyfulist/fleetglass/internal/money"
+	"github.com/thejoyfulist/fleetglass/internal/netguard"
 	"github.com/thejoyfulist/fleetglass/internal/store"
 	"github.com/thejoyfulist/fleetglass/web"
 )
@@ -27,6 +29,7 @@ type API struct {
 	Token              string
 	LegacyHostID       string
 	ReadToken          string
+	AllowedHosts       []string
 	MaxSubscribers     int
 	KeepAlive          time.Duration
 	AIPrices           map[string]model.AIPrice
@@ -335,6 +338,17 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/live", a.live)
 	mux.Handle("GET /", web.Handler())
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !netguard.AllowedHost(r.Host, a.AllowedHosts) {
+			http.Error(w, "host not allowed", http.StatusForbidden)
+			return
+		}
+		if origin := r.Header.Get("Origin"); origin != "" {
+			u, err := url.Parse(origin)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || !strings.EqualFold(u.Host, r.Host) || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+				http.Error(w, "origin not allowed", http.StatusForbidden)
+				return
+			}
+		}
 		if (strings.HasPrefix(r.URL.Path, "/api/v1/") && r.URL.Path != "/api/v1/status" && r.URL.Path != "/api/v1/ingest" && r.URL.Path != "/api/v1/auth" && r.URL.Path != "/api/v1/auth/signout" || r.URL.Path == "/metrics") && a.ReadToken != "" {
 			token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 			if !readTokenMatches(token, a.ReadToken) && !a.validSession(r) {

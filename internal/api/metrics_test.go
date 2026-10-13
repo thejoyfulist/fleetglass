@@ -24,11 +24,11 @@ func TestMetricsUsesReadAuthenticationAndEscapesLabels(t *testing.T) {
 	a.ReadToken = fixture("read-secret")
 	h := a.Handler()
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest("GET", "/metrics", nil))
+	h.ServeHTTP(w, localRequest("GET", "/metrics", nil))
 	if w.Code != 401 {
 		t.Fatalf("unprotected metrics: %d", w.Code)
 	}
-	r := httptest.NewRequest("GET", "/metrics", nil)
+	r := localRequest("GET", "/metrics", nil)
 	r.Header.Set("Authorization", "Bearer read-secret")
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)

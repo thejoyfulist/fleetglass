@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -14,6 +15,12 @@ import (
 	"github.com/thejoyfulist/fleetglass/internal/store"
 )
 
+func localRequest(method, target string, body io.Reader) *http.Request {
+	r := httptest.NewRequest(method, target, body)
+	r.Host = "127.0.0.1:7878"
+	return r
+}
+
 func TestIngestAndReadAPI(t *testing.T) {
 	s, e := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if e != nil {
@@ -22,13 +29,13 @@ func TestIngestAndReadAPI(t *testing.T) {
 	defer s.Close()
 	h := New(s, "secret", "test").Handler()
 	b, _ := json.Marshal(model.Batch{HostID: "test", At: time.Now().UTC(), Results: []model.Result{{Name: "cpu", State: model.OK, Detail: "busy", Values: map[string]float64{"busy_percent": 20}}}})
-	r := httptest.NewRequest("POST", "/api/v1/ingest", bytes.NewReader(b))
+	r := localRequest("POST", "/api/v1/ingest", bytes.NewReader(b))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	if w.Code != 401 {
 		t.Fatalf("missing token: %d", w.Code)
 	}
-	r = httptest.NewRequest("POST", "/api/v1/ingest", bytes.NewReader(b))
+	r = localRequest("POST", "/api/v1/ingest", bytes.NewReader(b))
 	r.Header.Set("Authorization", "Bearer secret")
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -37,10 +44,56 @@ func TestIngestAndReadAPI(t *testing.T) {
 	}
 	for _, path := range []string{"/api/v1/hosts", "/api/v1/hosts/test/overview", "/api/v1/hosts/test/series?metric=busy_percent&range=24h"} {
 		w = httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+		h.ServeHTTP(w, localRequest("GET", path, nil))
 		if w.Code != 200 || !strings.Contains(w.Body.String(), "test") && !strings.Contains(path, "series") {
 			t.Fatalf("%s: %d %s", path, w.Code, w.Body.String())
 		}
+	}
+}
+
+func TestAPIHostAllowlist(t *testing.T) {
+	s, err := store.Open(filepath.Join(t.TempDir(), "host-guard.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	a := New(s, "", "")
+	for _, tc := range []struct {
+		host string
+		want int
+	}{
+		{"attacker.example:7878", http.StatusForbidden},
+		{"127.0.0.1:7878", http.StatusOK},
+		{"cockpit.example:8444", http.StatusForbidden},
+	} {
+		r := localRequest(http.MethodGet, "/api/v1/hosts", nil)
+		r.Host = tc.host
+		w := httptest.NewRecorder()
+		a.Handler().ServeHTTP(w, r)
+		if w.Code != tc.want {
+			t.Fatalf("host %q: got %d, want %d", tc.host, w.Code, tc.want)
+		}
+	}
+	a.AllowedHosts = []string{"cockpit.example"}
+	r := localRequest(http.MethodGet, "/api/v1/hosts", nil)
+	r.Host = "cockpit.example:8444"
+	w := httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("configured host: %d", w.Code)
+	}
+	r = localRequest(http.MethodGet, "/api/v1/hosts", nil)
+	r.Header.Set("Origin", "https://attacker.example")
+	w = httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("cross-origin request: %d", w.Code)
+	}
+	r.Header.Set("Origin", "https://127.0.0.1:7878")
+	w = httptest.NewRecorder()
+	a.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("same-origin request: %d", w.Code)
 	}
 }
 func TestSSEDelivery(t *testing.T) {
@@ -99,13 +152,13 @@ func TestReadTokenProtectsAllReads(t *testing.T) {
 	h := a.Handler()
 	for _, path := range []string{"/api/v1/hosts", "/api/v1/hosts/h/overview", "/api/v1/hosts/h/series?metric=cpu", "/api/v1/hosts/h/agents", "/api/v1/hosts/h/ai/usage?range=24h&by=project", "/api/v1/hosts/h/ai/quotas", "/api/v1/hosts/h/ai/costs?range=24h", "/api/v1/hosts/h/changes?range=24h", "/api/v1/hosts/h/energy", "/api/v1/live"} {
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+		h.ServeHTTP(w, localRequest("GET", path, nil))
 		if w.Code != 401 {
 			t.Fatalf("%s unprotected: %d", path, w.Code)
 		}
 	}
 	for _, path := range []string{"/api/v1/hosts", "/"} {
-		r := httptest.NewRequest("GET", path, nil)
+		r := localRequest("GET", path, nil)
 		r.Header.Set("Authorization", "Bearer read-secret")
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)

@@ -26,7 +26,7 @@ func TestHostTokensAndFleet(t *testing.T) {
 	h := a.Handler()
 	send := func(host, token string) int {
 		b, _ := json.Marshal(model.Batch{HostID: host, At: time.Now().UTC(), Results: []model.Result{{Name: "cpu", State: model.OK, Values: map[string]float64{"busy_percent": 20}}}})
-		r := httptest.NewRequest(http.MethodPost, "/api/v1/ingest", bytes.NewReader(b))
+		r := localRequest(http.MethodPost, "/api/v1/ingest", bytes.NewReader(b))
 		r.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
@@ -44,7 +44,7 @@ func TestHostTokensAndFleet(t *testing.T) {
 		t.Fatalf("legacy host ingest %d", n)
 	}
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/fleet", nil))
+	h.ServeHTTP(w, localRequest("GET", "/api/v1/fleet", nil))
 	if w.Code != 200 {
 		t.Fatalf("fleet HTTP %d", w.Code)
 	}

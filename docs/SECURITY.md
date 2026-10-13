@@ -8,4 +8,6 @@ The cockpit and OTLP receiver bind to loopback by default. Remote agent ingest r
 
 The MCP listener rejects HTTP Host names other than literal loopback addresses or `localhost`, as well as browser Origin headers. The tokenless OTLP listener applies the same Host check. The root helper caps SMART command output at 1 MiB before parsing it.
 
+The cockpit/API accepts loopback Host names plus entries in `allowed_hosts` and rejects browser Origin headers that name another host. Configure the exact browser-facing hostname when a reverse proxy is used; entries may include a port to restrict the match.
+
 Builds require Go 1.26.9 or newer so distributed binaries include the security fixes in that standard-library release.

@@ -11,7 +11,7 @@ func TestUpdateCheckDisabledByDefault(t *testing.T) {
 	a.Version = "1.2.3"
 	a.Commit = "abcdef123456"
 	w := httptest.NewRecorder()
-	a.version(w, httptest.NewRequest("GET", "/api/v1/version", nil))
+	a.version(w, localRequest("GET", "/api/v1/version", nil))
 	var body struct {
 		Version string `json:"version"`
 		Commit  string `json:"commit"`

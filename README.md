@@ -60,6 +60,8 @@ Open the cockpit at **http://127.0.0.1:7878** on the server. For private access 
 sudo tailscale serve --bg --https=8443 http://127.0.0.1:7878
 ```
 
+Before exposing the cockpit through a proxy, add the hostname the browser uses to `allowed_hosts` in the server configuration, for example `"allowed_hosts": ["cockpit.example.test"]`. An entry without a port permits that hostname on any port; `"cockpit.example.test:8443"` restricts it to one port. The default accepts loopback names only. See [configuration](docs/CONFIGURATION.md).
+
 ## Connect your agents
 
 Fleetglass receives OTLP/HTTP metrics and logs on `127.0.0.1:4318`. For Claude Code, add this `env` block to `~/.claude/settings.json` (merge it with existing settings):
@@ -131,6 +133,7 @@ Load `FLEETGLASS_MCP_TOKEN` into the CLI's environment from its private token fi
 - No product telemetry is sent to the maintainers. The optional release check is off by default.
 - Cockpit and OTLP bind to loopback by default; remote agent connections require HTTPS and a token.
 - The local MCP endpoint, and OTLP when no token is configured, accept only loopback HTTP Host names to prevent DNS rebinding. SMART command output is capped at 1 MiB.
+- Cockpit/API requests require an allowed HTTP Host and reject a different browser Origin.
 - The agent runs without root; a small root helper has a fixed read allowlist.
 - Prompts are filtered from ingestion and never stored. See the [security model](docs/SECURITY.md).
 

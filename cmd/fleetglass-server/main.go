@@ -90,6 +90,7 @@ func main() {
 	log.Printf("listening on %s", c.Listen)
 	a := api.New(s, c.Token, c.HostID)
 	a.ReadToken = c.ReadToken
+	a.AllowedHosts = c.AllowedHosts
 	a.MaxSubscribers = c.LiveMaxSubscribers
 	a.AIPrices = c.AIPrices
 	a.AgentNoEditMinutes = c.AgentNoEditMinutes
