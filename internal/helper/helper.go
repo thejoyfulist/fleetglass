@@ -1,10 +1,12 @@
 package helper
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -32,6 +34,31 @@ func imageFingerprint(id string) string {
 }
 
 type Run func(context.Context, string, ...string) ([]byte, error)
+
+const maxSMARTOutput = 1 << 20
+
+var errOutputLimit = errors.New("command output limit exceeded")
+
+type boundedOutput struct {
+	buf   bytes.Buffer
+	limit int
+}
+
+func (b *boundedOutput) Write(p []byte) (int, error) {
+	if len(p) > b.limit-b.buf.Len() {
+		return 0, errOutputLimit
+	}
+	return b.buf.Write(p)
+}
+
+func runBounded(ctx context.Context, name string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	out := &boundedOutput{limit: maxSMARTOutput}
+	cmd.Stdout = out
+	err := cmd.Run()
+	return out.buf.Bytes(), err
+}
+
 type Handler struct {
 	Devices          []string
 	DockerSockets    []string
@@ -168,13 +195,15 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		run := h.Run
 		if run == nil {
-			run = func(ctx context.Context, n string, a ...string) ([]byte, error) {
-				return exec.CommandContext(ctx, n, a...).Output()
-			}
+			run = runBounded
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		b, e := run(ctx, "smartctl", "-j", "-H", "-A", h.Devices[idx])
+		if errors.Is(e, errOutputLimit) {
+			http.Error(w, "SMART output too large", http.StatusBadGateway)
+			return
+		}
 		if e != nil && len(b) == 0 {
 			http.Error(w, "SMART unavailable", 503)
 			return

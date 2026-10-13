@@ -53,6 +53,7 @@ func sendOTLP(t *testing.T, h http.Handler, path, key string, v proto.Message, j
 		b = buf.Bytes()
 	}
 	r := httptest.NewRequest("POST", path, bytes.NewReader(b))
+	r.Host = "127.0.0.1:4318"
 	r.Header.Set("Content-Type", ct)
 	if gzipMode {
 		r.Header.Set("Content-Encoding", "gzip")
@@ -105,6 +106,17 @@ func TestOTLPFormatsAndAllowlist(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestOTLPRejectsReboundHostWithoutToken(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/v1/logs", bytes.NewBufferString(`{"resourceLogs":[]}`))
+	r.Host = "attacker.example:4318"
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	NewReceiver().Handler("").ServeHTTP(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("rebound host: %d", w.Code)
 	}
 }
 

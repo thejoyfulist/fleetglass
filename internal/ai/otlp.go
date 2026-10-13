@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/thejoyfulist/fleetglass/internal/model"
+	"github.com/thejoyfulist/fleetglass/internal/netguard"
 	common "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
@@ -154,7 +155,13 @@ func (x *Receiver) Handler(token string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/metrics", func(w http.ResponseWriter, r *http.Request) { x.receive(w, r, true, token) })
 	mux.HandleFunc("POST /v1/logs", func(w http.ResponseWriter, r *http.Request) { x.receive(w, r, false, token) })
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if token == "" && !netguard.LoopbackHost(r.Host) {
+			http.Error(w, "host not allowed", http.StatusForbidden)
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 func ValidateListen(addr, token string) error {
 	h, _, err := net.SplitHostPort(addr)

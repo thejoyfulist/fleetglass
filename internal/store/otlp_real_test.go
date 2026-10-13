@@ -62,6 +62,7 @@ func sendCapturedClaudeMetrics(t *testing.T, receiver *ai.Receiver, at time.Time
 	}
 	wire := protowire.AppendBytes(protowire.AppendTag(nil, 1, protowire.BytesType), part)
 	r := httptest.NewRequest("POST", "/v1/metrics", bytes.NewReader(wire))
+	r.Host = "127.0.0.1:4318"
 	r.Header.Set("Content-Type", "application/x-protobuf")
 	w := httptest.NewRecorder()
 	receiver.Handler("").ServeHTTP(w, r)
@@ -107,6 +108,7 @@ func TestRealAnonymizedOTLPSessions(t *testing.T) {
 			}
 			wire := protowire.AppendBytes(protowire.AppendTag(nil, 1, protowire.BytesType), part)
 			r := httptest.NewRequest("POST", "/v1/logs", bytes.NewReader(wire))
+			r.Host = "127.0.0.1:4318"
 			r.Header.Set("Content-Type", "application/x-protobuf")
 			w := httptest.NewRecorder()
 			receiver.Handler("").ServeHTTP(w, r)

@@ -1,6 +1,6 @@
 module github.com/thejoyfulist/fleetglass
 
-go 1.26
+go 1.26.9
 
 require (
 	go.opentelemetry.io/proto/otlp v1.9.0

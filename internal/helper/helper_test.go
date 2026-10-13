@@ -45,6 +45,24 @@ func TestValidateDevices(t *testing.T) {
 	}
 }
 
+func TestSMARTCommandOutputIsBounded(t *testing.T) {
+	output, err := runBounded(context.Background(), "sh", "-c", "head -c 1048577 /dev/zero")
+	if err == nil || len(output) > maxSMARTOutput {
+		t.Fatalf("oversized command output: bytes=%d error=%v", len(output), err)
+	}
+}
+
+func TestSMARTRejectsTruncatedOutput(t *testing.T) {
+	h := Handler{Devices: []string{"/dev/nvme0"}, Run: func(context.Context, string, ...string) ([]byte, error) {
+		return []byte(`{"smart_status":{"passed":true}}`), errOutputLimit
+	}}
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/smart/0", nil))
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("truncated SMART output: %d", w.Code)
+	}
+}
+
 func TestDockerRouteReturnsOnlySummary(t *testing.T) {
 	socket := filepath.Join(t.TempDir(), "docker.sock")
 	l, err := net.Listen("unix", socket)

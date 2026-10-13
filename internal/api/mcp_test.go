@@ -28,6 +28,7 @@ func TestMCPProtocolReadOnlyAndToken(t *testing.T) {
 	request := func(body, token string) *httptest.ResponseRecorder {
 		t.Helper()
 		r := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewBufferString(body))
+		r.Host = "127.0.0.1:7879"
 		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("Accept", "application/json, text/event-stream")
 		if token != "" {
@@ -77,6 +78,7 @@ func TestMCPProtocolReadOnlyAndToken(t *testing.T) {
 		t.Fatalf("unexpected action: %s", got.Body.String())
 	}
 	r := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewBufferString(init))
+	r.Host = "127.0.0.1:7879"
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Origin", "https://other.example")
 	r.Header.Set("Authorization", "Bearer "+strings.Repeat("t", 40))
@@ -84,6 +86,15 @@ func TestMCPProtocolReadOnlyAndToken(t *testing.T) {
 	h.ServeHTTP(w, r)
 	if w.Code != 403 {
 		t.Fatalf("origin: %d", w.Code)
+	}
+	r = httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewBufferString(init))
+	r.Host = "attacker.example:7879"
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer "+strings.Repeat("t", 40))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("rebound host: %d", w.Code)
 	}
 }
 

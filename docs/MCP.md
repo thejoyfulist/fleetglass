@@ -17,6 +17,8 @@ Create a private token file (at least 32 characters, preferably 32 random bytes 
 
 The endpoint is then `http://127.0.0.1:7879/mcp`. The listener rejects non-loopback bind addresses. If a client runs elsewhere, use an authenticated tunnel or a TLS reverse proxy controlled by the operator; never expose the loopback endpoint directly over an unencrypted network. The MCP token is separate from ingest and dashboard read tokens. Do not place it in this repository, a URL, shell history, or a committed config file.
 
+The endpoint requires an HTTP Host header naming `localhost` or a literal loopback IP. A proxy must forward such a Host header to the local listener.
+
 Optional dashboard defaults can be set in the server config. Browser preferences take precedence and can be reset to these defaults:
 
 ```json

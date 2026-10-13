@@ -2,6 +2,8 @@
 
 Fleetglass receives OTLP/HTTP on `127.0.0.1:4318`. Configure each CLI user separately; the receiver accepts metrics and logs, not gRPC or traces. Keep the listener local. OTLP is the preferred path because it provides exact token and timing events when the CLI emits them.
 
+When no OTLP token is configured, the receiver accepts only HTTP Host headers naming `localhost` or a literal loopback IP. Use the loopback endpoint in local exporters.
+
 For Claude Code, merge this `env` block into the user-level `~/.claude/settings.json`:
 
 ```json

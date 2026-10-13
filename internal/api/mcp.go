@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/thejoyfulist/fleetglass/internal/model"
+	"github.com/thejoyfulist/fleetglass/internal/netguard"
 )
 
 // MCPHandler is a separate, token-only, stateless Streamable HTTP endpoint.
@@ -16,6 +17,10 @@ func (a *API) MCPHandler(token string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/mcp" {
 			http.NotFound(w, r)
+			return
+		}
+		if !netguard.LoopbackHost(r.Host) {
+			http.Error(w, "host not allowed", http.StatusForbidden)
 			return
 		}
 		if r.Header.Get("Origin") != "" {

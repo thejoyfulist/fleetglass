@@ -6,7 +6,7 @@
     <a href="https://github.com/thejoyfulist/fleetglass/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/thejoyfulist/fleetglass/ci.yml?style=flat-square&label=CI&color=555555"></a>
     <a href="https://github.com/thejoyfulist/fleetglass/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/thejoyfulist/fleetglass?style=flat-square&color=555555"></a>
     <a href="LICENSE"><img alt="AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-555555?style=flat-square"></a>
-    <a href="go.mod"><img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-555555?style=flat-square"></a>
+    <a href="go.mod"><img alt="Go 1.26.9" src="https://img.shields.io/badge/Go-1.26.9-555555?style=flat-square"></a>
     <a href="docs/INSTALL.md"><img alt="Linux amd64 and arm64" src="https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-555555?style=flat-square"></a>
   </p>
   <p><a href="#install">Install</a> · <a href="#features">Features</a> · <a href="#connect-your-agents">Connect agents</a> · <a href="#ask-it-from-your-agents-mcp">MCP</a> · <a href="#docs">Docs</a></p>
@@ -130,6 +130,7 @@ Load `FLEETGLASS_MCP_TOKEN` into the CLI's environment from its private token fi
 
 - No product telemetry is sent to the maintainers. The optional release check is off by default.
 - Cockpit and OTLP bind to loopback by default; remote agent connections require HTTPS and a token.
+- The local MCP endpoint, and OTLP when no token is configured, accept only loopback HTTP Host names to prevent DNS rebinding. SMART command output is capped at 1 MiB.
 - The agent runs without root; a small root helper has a fixed read allowlist.
 - Prompts are filtered from ingestion and never stored. See the [security model](docs/SECURITY.md).
 
