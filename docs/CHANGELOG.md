@@ -6,6 +6,8 @@ All notable user-facing changes are documented here. This project follows [Keep 
 
 ### Fixed
 
+- Align the Costs energy and conversion note with the panel grid, remove the repeated Forecast heading, and keep overview quota forecasts readable at desktop width.
+- Show day labels, a timeline legend, and the last seven daily allowance bars for reported quota windows; the synthetic forecast capture now includes Claude status-line limits.
 - Local MCP and tokenless OTLP reject non-loopback HTTP Host headers; privileged SMART output is bounded to 1 MiB.
 - Cockpit/API requests now enforce an explicit HTTP Host allowlist and same-host browser Origin; reverse proxies must declare their hostname in `allowed_hosts`.
 - Go builds now require 1.26.9, which includes the current standard-library security fixes.

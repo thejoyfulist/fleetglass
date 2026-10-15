@@ -28,12 +28,28 @@ fixture.AGENTS[0].update({"last_file_edit_at":fixture.iso(-180),"last_tool_at":f
 fixture.AGENTS[1].update({"state":"working","last_file_edit_at":fixture.iso(-1620),"last_tool_at":fixture.iso(-60),"last_tool":"Bash","minutes_since_file_edit":27,"activity":"working, no file changes for 27m (possibly looping)","flag":True,"provenance":{**fixture.AGENTS[1]["provenance"],"file_edit":"log","tool":"log"}})
 fixture.AGENTS[2].update({"state":"idle","last_file_edit_at":fixture.iso(-3600),"last_tool_at":fixture.iso(-2400),"last_tool":"Read","minutes_since_file_edit":60,"activity":"idle","flag":False,"provenance":{**fixture.AGENTS[2]["provenance"],"file_edit":"otel","tool":"otel"}})
 fixture.AGENTS.append({"id":"process-only-demo", "kind":"codex", "project":"demo", "worktree":"", "at":fixture.iso(), "state":"running", "reason":"process alive", "source":"process", "sources":["process"], "provenance":{"state":"process","resources":"process","project":"process"}, "pid":2999, "cpu_percent":1.0, "rss_bytes":128*1024**2, "model":""})
-fixture.QUOTAS[:] = [{"kind": "codex", "window": "primary", "window_minutes": 10080,
-                      "used_percent": 42, "resets_at": fixture.iso(4 * 86400),
-                      "observed_at": fixture.iso(), "method": "cli_reported",
-                      "forecast": {"pace_pph": 0.9, "even_ratio": 1.5, "percent_at_reset": 100,
-                                   "runs_out_at": fixture.iso(2 * 86400), "locked_hours": 48,
-                                   "daily": [{"day": "2026-10-15", "used_pp": 19, "allowed_pp": 14.3}]}}]
+fixture.QUOTAS[:] = [
+    {"kind": "codex", "window": "primary", "window_minutes": 10080,
+     "used_percent": 42, "resets_at": fixture.iso(4 * 86400), "observed_at": fixture.iso(),
+     "method": "cli_reported", "forecast": {"pace_pph": 0.34, "even_ratio": 0.57,
+     "percent_at_reset": 75, "runs_out_at": None, "locked_hours": 0,
+     "daily": [{"day": f"2026-10-{day:02d}", "used_pp": used, "allowed_pp": 14.3}
+               for day, used in zip(range(9, 16), [7, 10, 9, 11, 8, 12, 10])]}},
+    {"kind": "codex", "window": "primary", "window_minutes": 300,
+     "used_percent": 30, "resets_at": fixture.iso(3 * 3600), "observed_at": fixture.iso(),
+     "method": "cli_reported", "forecast": {"pace_pph": 12, "even_ratio": 0.6,
+     "percent_at_reset": 66, "runs_out_at": None, "locked_hours": 0, "daily": []}},
+    {"kind": "claude", "window": "5h", "window_minutes": 300,
+     "used_percent": 50, "resets_at": fixture.iso(3 * 3600), "observed_at": fixture.iso(),
+     "method": "reported", "source": "statusline", "forecast": {"pace_pph": 12, "even_ratio": 0.6,
+     "percent_at_reset": 86, "runs_out_at": None, "locked_hours": 0, "daily": []}},
+    {"kind": "claude", "window": "7d", "window_minutes": 10080,
+     "used_percent": 70, "resets_at": fixture.iso(4 * 86400), "observed_at": fixture.iso(),
+     "method": "reported", "source": "statusline", "forecast": {"pace_pph": 0.8, "even_ratio": 1.34,
+     "percent_at_reset": 100, "runs_out_at": fixture.iso(2 * 86400), "locked_hours": 48,
+     "daily": [{"day": f"2026-10-{day:02d}", "used_pp": used, "allowed_pp": 14.3}
+               for day, used in zip(range(9, 16), [9, 16, 12, 18, 14, 20, 19])]}},
+]
 fixture.SUBSCRIPTIONS[0]["subscription_usd"] = 20
 fixture.RESULTS.extend(fixture.result(f"network:{name}", {"rx_bytes_per_second": 4096-i*300,
                        "tx_bytes_per_second": 1024+i*100, "rx_bytes": 10**9,
@@ -112,6 +128,20 @@ def inspect(page, width):
       if(location.pathname==='/'&&!document.querySelector('main')?.innerText.includes('what stands out'))errors.push('English terminal labels missing');
       return [...new Set(errors)];
     }""", width)
+
+def inspect_forecast_quota(page, panel):
+    return page.get_by_role('region', name=panel).evaluate("""panel => {
+      const errors=[];
+      const body=panel.querySelector('.terminal-box-body, .g');
+      if(body && body.scrollWidth>body.clientWidth+1 && getComputedStyle(body).overflowX==='hidden') errors.push(`${panel.getAttribute('aria-label')} body clipped`);
+      for(const cell of panel.querySelectorAll('td')){
+        if(cell.scrollWidth>cell.clientWidth+1) errors.push(`cell clipped: ${cell.textContent.trim()}`);
+      }
+      for(const line of panel.querySelectorAll('.forecast-timeline')){
+        if(line.scrollWidth>line.clientWidth+1 && getComputedStyle(line).overflowX==='hidden') errors.push('timeline clipped');
+      }
+      return errors;
+    }""")
 
 def inspect_sticky_tabs(page):
     page.evaluate("""() => {
@@ -212,16 +242,23 @@ def main():
                         if 'containers (' not in network_text or 'more' not in network_text: errors.append(f"{theme}: network grouping or overflow link missing")
                         if page.get_by_role('region',name='Network').evaluate("e => {const b=e.querySelector('.terminal-box-body');return b.scrollWidth>b.clientWidth+1 || [...e.querySelectorAll('td.numeric')].some(c=>c.scrollWidth>c.clientWidth+1)}"):
                             errors.append(f"{theme}: Network clipping at 1440")
-                        if 'Claude · not reported' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: missing Claude quota invented or hidden")
+                        if page.get_by_role('region',name='Quotas').inner_text().count('statusline') != 2: errors.append(f"{theme}: Claude status-line windows missing")
                         if '7 days' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: weekly primary quota mislabelled")
+                        errors.extend(f"overview-{theme}: {e}" for e in inspect_forecast_quota(page, 'Quotas'))
                         if '0.0.0-dev' in status or '93f9731' not in status: errors.append(f"{theme}: dev commit missing")
                     if view=="costs":
                         forecast = page.get_by_role('region',name='Forecast')
                         if 'locked' not in forecast.inner_text() or '▒' not in forecast.inner_text(): errors.append(f"{theme}: forecast timeline missing")
+                        if forecast.locator('h3').count(): errors.append(f"{theme}: duplicate Forecast heading")
+                        if forecast.locator('.forecast-timeline').count() != 4: errors.append(f"{theme}: missing quota timelines")
+                        if 'set claude_budget_5h' in page.locator('main').inner_text(): errors.append(f"{theme}: stale Claude budget hint")
+                        errors.extend(f"costs-{theme}: {e}" for e in inspect_forecast_quota(page, 'Quotas'))
+                        errors.extend(f"costs-{theme}: {e}" for e in inspect_forecast_quota(page, 'Forecast'))
                         if theme=="dark":
                             forecast.scroll_into_view_if_needed()
+                            page.evaluate('window.scrollBy(0, 70)')
                             page.screenshot(path=str(Path(__file__).parents[2]/'assets/screenshots/forecast-dark.png'), full_page=False)
-                        if 'Claude · not reported' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: Costs quota status missing")
+                        if page.get_by_role('region',name='Quotas').inner_text().count('statusline') != 2: errors.append(f"{theme}: Costs Claude status-line windows missing")
                         if 'ECB rate' in str(page.locator('table').all_inner_texts()): errors.append(f"{theme}: Costs table repeats conversion source")
                         if page.locator('main').inner_text().count('EUR at ECB rate Oct 9') != 1: errors.append(f"{theme}: Costs conversion source is not shown once")
                     errors.extend(f"{view}-{theme}: {e}" for e in inspect(page,1440))
@@ -229,7 +266,7 @@ def main():
                         page.set_viewport_size({"width":1280,"height":900})
                         errors.extend(f"{view}-{theme}-1280: {e}" for e in inspect(page,1280))
                         page.set_viewport_size({"width":1440,"height":900})
-                    if view=="agents" and 'Claude · not reported' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: Agents quota status missing")
+                    if view=="agents" and page.get_by_role('region',name='Quotas').inner_text().count('statusline') != 2: errors.append(f"{theme}: Agents Claude status-line windows missing")
                     if view=="agents":
                         if theme=="dark":
                             page.screenshot(path=str(OUT/"loop-flag-dark.png"), full_page=False)
@@ -277,6 +314,10 @@ def main():
                     if view=="agents":
                         errors.extend(f"agents-{theme}-mobile-detail: {e}" for e in inspect_detail_metrics(mobile))
                         errors.extend(f"{theme}: mobile {e}" for e in inspect_loop_flag(mobile))
+                    if view in ("overview", "costs"):
+                        errors.extend(f"{view}-{theme}-390: {e}" for e in inspect_forecast_quota(mobile, 'Quotas'))
+                    if view == "costs":
+                        errors.extend(f"costs-{theme}-390: {e}" for e in inspect_forecast_quota(mobile, 'Forecast'))
                     if view == "overview":
                         mobile.screenshot(path=str(OUT/f"overview-{theme}-mobile.png"),full_page=True)
                     if view == "costs" and mobile.evaluate("document.documentElement.scrollWidth>innerWidth+1"):

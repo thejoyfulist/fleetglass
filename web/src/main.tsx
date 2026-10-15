@@ -624,7 +624,7 @@ function Quotas({ quotas, subscriptions, wide=false }: { quotas: Quota[]; subscr
     ...quotas.map(q=>[agentName(q.kind),quotaWindow(q.window,q.window_minutes),formatQuotaPercent(q.used_percent),<TerminalBar percent={q.used_percent} width={12} pace={pace(q)}/>,reset(q.resets_at),wide?<span>{forecastText(q)}</span>:forecastText(q),q.source==="statusline"?"statusline":quotaMethod(q.method,q.kind)]),
     ...missing.map(s=>[<span className="terminal-dim">{agentName(s.kind)}</span>,"—","—","—","—","—",<span className="terminal-dim">{t("quota.not_reported",{plan:agentName(s.kind)})}</span>]),
   ];
-  return <><p className="quota-advice">{forecastHeadline(quotas)}</p><TerminalTable heads={[t("terminal.label_plan"),t("terminal.label_window"),t("terminal.label_used"),t("terminal.pace"),t("terminal.label_reset"),activeLanguage()==="fr"?"prévision":"forecast",t("terminal.label_source")]} right={[2,4]} rows={rows}/>{missing.some(s=>s.kind==="claude")?<p className="quota-hint terminal-dim">{t("quota.claude_hint")}</p>:null}</>;
+  return <><p className="quota-advice">{forecastHeadline(quotas)}</p><div className="quota-overview-table"><TerminalTable heads={[t("terminal.label_plan"),t("terminal.label_window"),t("terminal.label_used"),t("terminal.pace"),t("terminal.label_reset"),activeLanguage()==="fr"?"prévision":"forecast",t("terminal.label_source")]} right={[2,4]} rows={rows}/></div>{missing.some(s=>s.kind==="claude")?<p className="quota-hint terminal-dim">{t("quota.claude_hint")}</p>:null}</>;
 }
 function SpeedPanel({speed,host,session}: {speed:SpeedSummary[];host?:string;session?:string}) {
   const [window,setWindow] = useState<"1h"|"24h">("1h");
@@ -1359,15 +1359,15 @@ function CostsView({
         setRange={setRange}
       />
       <div className="bento compact-rows">
-        {rateFootnote?<p className="foot terminal-dim">{rateFootnote}</p>:null}
         <Tile title={t("subscription.title")} source={t("subscription.this_month")} className="full">
           <TerminalTable heads={[t("terminal.label_plan"),t("subscription.api_equivalent"),t("ui.month.cost.dedfe"),t("terminal.label_state")]} right={[1,2]} rows={data.subscriptions.map(s=>[agentName(s.kind),s.api_money?formatMoneyValue(s.api_money):formatMoney(s.api_equivalent_usd),s.subscription_usd===null?t("terminal.not_collected"):s.subscription_money?formatMoneyValue(s.subscription_money):formatMoney(s.subscription_amount??s.subscription_usd),s.coverage])}/>
         </Tile>
         <Tile title={t("ui.quotas.34ed5")} className="full"><Quotas quotas={data.quotas} subscriptions={data.subscriptions} wide/></Tile>
         <Tile title={activeLanguage()==="fr"?"Prévisions":"Forecast"} className="full"><ForecastView quotas={data.quotas}/></Tile>
-        {data.energy?.month_seconds ? <Tile title={t("ui.energy.437bc")} source={t("ui.cpu.package.only.56d4b")} className="half">
+        {data.energy?.month_seconds ? <Tile title={t("ui.energy.437bc")} source={t("ui.cpu.package.only.56d4b")} className="full">
           <div className="stat-grid"><div><span>{t("ui.today.24345")}</span><b>{formatNumber(data.energy.today_kwh, 3)} {" "}{t("ui.kwh.72c28")}</b></div><div><span>{t("ui.this.month.1b478")}</span><b>{formatNumber(data.energy.month_kwh, 3)} {" "}{t("ui.kwh.72c28")}</b></div><div><span>{t("ui.today.cost.193fc")}</span><MoneyStat money={data.energy.today_money} amount={data.energy.today_cost} currency={data.energy.currency}/></div><div><span>{t("ui.month.cost.dedfe")}</span><MoneyStat money={data.energy.month_money} amount={data.energy.month_cost} currency={data.energy.currency}/></div></div>
           <p className="foot">{t("ui.at.08550")}{" "}{(data.energy.price_money ? formatMoneyValue(data.energy.price_money) : formatMoney(data.energy.price_per_kwh,data.energy.currency))}{t("ui.kwh.observed.intervals.only.cpu.package.only.not.148fe")}</p>
+          {rateFootnote?<p className="foot terminal-dim">{rateFootnote}</p>:null}
         </Tile> : null}
         <Tile
           title={t("ui.ai.cost.by.project.26d43")}

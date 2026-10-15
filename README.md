@@ -110,7 +110,7 @@ Session metric sources: [light detail](assets/screenshots/agents-detail-light.pn
 
 [See the possible-loop flag in a synthetic 1440×900 capture](assets/screenshots/loop-flag-dark.png).
 
-[See the synthetic quota forecast at 1440×900](assets/screenshots/forecast-dark.png). Forecasts use recent quota history and show unknown when observations are insufficient; see [the method](docs/AI-AGENTS.md#quota-forecast).
+[See the synthetic quota forecast at 1440×900](assets/screenshots/forecast-dark.png). The Costs view shows a labelled timeline for each reported quota window, seven daily allowance bars for weekly windows, and a legend. Forecasts use recent quota history and show unknown when observations are insufficient; see [the method](docs/AI-AGENTS.md#quota-forecast).
 
 Keyboard shortcuts: `1`–`9` views, `r` range, `/` search, `t` theme. The cockpit has light and dark themes and a mobile layout. [See the full screenshot set](assets/screenshots/).
 

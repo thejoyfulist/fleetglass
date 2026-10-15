@@ -24,14 +24,24 @@ export function timeline(q:Quota):{cells:string[];marker:number} {
  const marker=Number.isFinite(run)?Math.max(0,Math.min(count-1,Math.floor((run-start)/(reset-start)*count))):-1;
  return {cells,marker};
 }
+export function timelineDayLabels(q:Quota):{label:string;start:number}[] {
+ if(q.window_minutes!==10080 || !q.forecast)return [];
+ const reset=new Date(q.resets_at).getTime();
+ const start=reset-10080*60000;
+ return Array.from({length:7},(_,day)=>({
+  label:new Date(start+day*86400000).toLocaleDateString(fr()?"fr-FR":"en-GB",{weekday:"short",timeZone:"UTC"}),
+  start:day*4,
+ }));
+}
 export function ForecastView({quotas}:{quotas:Quota[]}) {
- return <div className="forecast-view"><h3>{fr()?"Prévisions":"Forecast"}</h3>
+ return <div className="forecast-view">
   <p>{forecastHeadline(quotas)}</p>
-  {quotas.map(q=>{const f=q.forecast, line=timeline(q);return <div className="forecast-row" key={`${q.kind}:${q.window}`}>
+  {quotas.map(q=>{const f=q.forecast, line=timeline(q), days=timelineDayLabels(q);return <div className="forecast-row" key={`${q.kind}:${q.window}`}>
    <div><strong>{q.kind} {quotaWindow(q.window,q.window_minutes)}</strong> · {forecastText(q)}{f?` · ${f.even_ratio.toFixed(1)}× ${fr()?"rythme régulier":"even pace"}`:""}</div>
-   {f?<><div className="forecast-timeline" aria-label={forecastText(q)}>{line.cells.map((cell,i)=><span key={i} className={cell==="▒"?"terminal-warn":undefined}>{i===line.marker?"▴":cell}</span>)}<span>│</span></div>
+   {f?<>{days.length?<div className="forecast-day-labels terminal-dim">{days.map(day=><span key={day.start} style={{gridColumn:`${day.start+1} / span 4`}}>{day.label}</span>)}</div>:null}<div className="forecast-timeline" aria-label={forecastText(q)}>{line.cells.map((cell,i)=><span key={i} className={cell==="▒"?"terminal-warn":undefined}>{i===line.marker?"▲":cell}</span>)}<span>│</span></div>
    <div className="terminal-dim">{fr()?"Remise à zéro":"Reset"} {date(q.resets_at)}</div>
-   {f.daily.map(d=><div className={`forecast-day ${d.used_pp>d.allowed_pp?"terminal-warn":""}`} key={d.day}>{d.day} · {d.used_pp.toFixed(1)} pp / {d.allowed_pp.toFixed(1)} pp {fr()?"autorisés":"allowed"} <span>{"█".repeat(Math.min(20,Math.ceil(d.used_pp/d.allowed_pp*10)))}</span></div>)}</>:<div className="terminal-dim">{fr()?"Moins de deux observations récentes":"Fewer than two recent observations"}</div>}
+   {f.daily.slice(-7).map(d=><div className={`forecast-day ${d.used_pp>d.allowed_pp?"terminal-warn":""}`} key={d.day}><time dateTime={d.day}>{new Date(`${d.day}T12:00:00Z`).toLocaleDateString(fr()?"fr-FR":"en-GB",{weekday:"short",day:"numeric",timeZone:"UTC"})}</time><span className="forecast-day-bar">{"█".repeat(Math.min(20,Math.ceil(d.used_pp/d.allowed_pp*10)))}</span><span>{d.used_pp.toFixed(1)} pp / {d.allowed_pp.toFixed(1)} {fr()?"autorisés":"allowed"}</span></div>)}</>:<div className="terminal-dim">{fr()?"Moins de deux observations récentes":"Fewer than two recent observations"}</div>}
   </div>})}
+  {quotas.some(q=>q.forecast)?<p className="terminal-dim forecast-legend">█ {fr()?"prévu":"projected"} · ▒ {fr()?"bloqué jusqu'à la remise à zéro":"locked until reset"} · │ {fr()?"remise à zéro":"reset"} · ▲ {fr()?"épuisement":"runs out"}</p>:null}
  </div>;
 }
