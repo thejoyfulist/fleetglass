@@ -95,7 +95,7 @@ See [agent setup](docs/AI-AGENTS.md) for attribution, local log fallback, and qu
 
 | View | What it shows |
 | --- | --- |
-| Agents | Sessions, last observed file edit, possible-loop flag, token speed, cost by model and project, quotas with pace |
+| Agents | Sessions, last observed file edit, possible-loop flag, token speed, cost by model and project, quotas with pace and runout forecast |
 | Server | CPU, temperature, storage, energy, network |
 | Services & uptime | systemd, containers, probes, TLS |
 | Projects | Development servers, ports, worktrees, idle processes |
@@ -109,6 +109,8 @@ See [agent setup](docs/AI-AGENTS.md) for attribution, local log fallback, and qu
 Session metric sources: [light detail](assets/screenshots/agents-detail-light.png) · [dark detail](assets/screenshots/agents-detail-dark.png).
 
 [See the possible-loop flag in a synthetic 1440×900 capture](assets/screenshots/loop-flag-dark.png).
+
+[See the synthetic quota forecast at 1440×900](assets/screenshots/forecast-dark.png). Forecasts use recent quota history and show unknown when observations are insufficient; see [the method](docs/AI-AGENTS.md#quota-forecast).
 
 Keyboard shortcuts: `1`–`9` views, `r` range, `/` search, `t` theme. The cockpit has light and dark themes and a mobile layout. [See the full screenshot set](assets/screenshots/).
 

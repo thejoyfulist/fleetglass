@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/thejoyfulist/fleetglass/internal/ai"
+	"github.com/thejoyfulist/fleetglass/internal/forecast"
 	"github.com/thejoyfulist/fleetglass/internal/model"
 )
 
@@ -385,6 +386,7 @@ func (s *Store) Quotas(host string) ([]model.Quota, error) {
 	}
 	defer rows.Close()
 	latest := map[string]model.Quota{}
+	history := map[string][]model.Quota{}
 	times := map[string]int64{}
 	for rows.Next() {
 		var kind, window, b string
@@ -393,17 +395,18 @@ func (s *Store) Quotas(host string) ([]model.Quota, error) {
 			return nil, e
 		}
 		key := kind + ":" + window
-		if at <= times[key] {
-			continue
-		}
 		var q model.Quota
 		if json.Unmarshal([]byte(b), &q) == nil {
-			times[key] = at
-			latest[key] = q
+			history[key] = append(history[key], q)
+			if at > times[key] {
+				times[key] = at
+				latest[key] = q
+			}
 		}
 	}
 	out := []model.Quota{}
-	for _, q := range latest {
+	for key, q := range latest {
+		q.Forecast = forecast.Quota(q, history[key], time.Now().UTC())
 		out = append(out, q)
 	}
 	sort.Slice(out, func(i, j int) bool {

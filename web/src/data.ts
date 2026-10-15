@@ -103,6 +103,8 @@ export interface Quota {
   projected_at?: string;
   method: string;
   observed_at: string;
+  source?: string;
+  forecast?: {pace_pph:number;even_ratio:number;percent_at_reset:number;runs_out_at?:string;locked_hours:number;daily:{day:string;used_pp:number;allowed_pp:number}[]};
 }
 export interface Cost {
   project: string;

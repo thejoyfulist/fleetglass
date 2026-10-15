@@ -53,6 +53,28 @@ type API struct {
 	loginAttempts      map[string][]time.Time
 }
 
+func withClaudeFallback(reported, estimates []model.Quota, now time.Time) []model.Quota {
+	out := make([]model.Quota, 0, len(reported)+len(estimates))
+	for _, q := range reported {
+		if q.Kind != "claude" || q.Method != "reported" || q.ResetsAt.After(now) {
+			out = append(out, q)
+		}
+	}
+	for _, estimate := range estimates {
+		found := false
+		for _, q := range reported {
+			if q.Kind == estimate.Kind && q.Window == estimate.Window && q.Method == "reported" && q.ResetsAt.After(now) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			out = append(out, estimate)
+		}
+	}
+	return out
+}
+
 func New(s *store.Store, token, legacyHostID string) *API {
 	return &API{Store: s, Money: &money.Service{}, Token: token, LegacyHostID: legacyHostID, AgentNoEditMinutes: 20, MaxSubscribers: 32, KeepAlive: 25 * time.Second, subs: map[chan model.Overview]struct{}{}, sessions: map[string]time.Time{}, loginAttempts: map[string][]time.Time{}}
 }
@@ -274,18 +296,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/hosts/{id}/ai/quotas", func(w http.ResponseWriter, r *http.Request) {
 		v, e := a.Store.Quotas(r.PathValue("id"))
 		if e == nil {
-			for _, estimate := range a.Store.ClaudeEstimates(r.PathValue("id"), a.ClaudeBudget5H, a.ClaudeBudgetWeek) {
-				reported := false
-				for _, q := range v {
-					if q.Kind == estimate.Kind && q.Window == estimate.Window && q.Method == "reported" && q.ResetsAt.After(time.Now()) {
-						reported = true
-						break
-					}
-				}
-				if !reported {
-					v = append(v, estimate)
-				}
-			}
+			v = withClaudeFallback(v, a.Store.ClaudeEstimates(r.PathValue("id"), a.ClaudeBudget5H, a.ClaudeBudgetWeek), time.Now())
 		}
 		if e != nil {
 			http.Error(w, "storage error", 500)

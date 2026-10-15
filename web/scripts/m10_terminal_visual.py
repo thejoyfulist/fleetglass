@@ -30,7 +30,10 @@ fixture.AGENTS[2].update({"state":"idle","last_file_edit_at":fixture.iso(-3600),
 fixture.AGENTS.append({"id":"process-only-demo", "kind":"codex", "project":"demo", "worktree":"", "at":fixture.iso(), "state":"running", "reason":"process alive", "source":"process", "sources":["process"], "provenance":{"state":"process","resources":"process","project":"process"}, "pid":2999, "cpu_percent":1.0, "rss_bytes":128*1024**2, "model":""})
 fixture.QUOTAS[:] = [{"kind": "codex", "window": "primary", "window_minutes": 10080,
                       "used_percent": 42, "resets_at": fixture.iso(4 * 86400),
-                      "observed_at": fixture.iso(), "method": "cli_reported"}]
+                      "observed_at": fixture.iso(), "method": "cli_reported",
+                      "forecast": {"pace_pph": 0.9, "even_ratio": 1.5, "percent_at_reset": 100,
+                                   "runs_out_at": fixture.iso(2 * 86400), "locked_hours": 48,
+                                   "daily": [{"day": "2026-10-15", "used_pp": 19, "allowed_pp": 14.3}]}}]
 fixture.SUBSCRIPTIONS[0]["subscription_usd"] = 20
 fixture.RESULTS.extend(fixture.result(f"network:{name}", {"rx_bytes_per_second": 4096-i*300,
                        "tx_bytes_per_second": 1024+i*100, "rx_bytes": 10**9,
@@ -213,6 +216,11 @@ def main():
                         if '7 days' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: weekly primary quota mislabelled")
                         if '0.0.0-dev' in status or '93f9731' not in status: errors.append(f"{theme}: dev commit missing")
                     if view=="costs":
+                        forecast = page.get_by_role('region',name='Forecast')
+                        if 'locked' not in forecast.inner_text() or '▒' not in forecast.inner_text(): errors.append(f"{theme}: forecast timeline missing")
+                        if theme=="dark":
+                            forecast.scroll_into_view_if_needed()
+                            page.screenshot(path=str(Path(__file__).parents[2]/'assets/screenshots/forecast-dark.png'), full_page=False)
                         if 'Claude · not reported' not in page.get_by_role('region',name='Quotas').inner_text(): errors.append(f"{theme}: Costs quota status missing")
                         if 'ECB rate' in str(page.locator('table').all_inner_texts()): errors.append(f"{theme}: Costs table repeats conversion source")
                         if page.locator('main').inner_text().count('EUR at ECB rate Oct 9') != 1: errors.append(f"{theme}: Costs conversion source is not shown once")
@@ -263,7 +271,7 @@ def main():
                 page.close()
                 mobile=browser.new_page(viewport={"width":390,"height":844},device_scale_factor=1)
                 mobile.add_init_script("window.localStorage.setItem('fg-theme', '%s');window.EventSource=class {constructor(){setTimeout(()=>this.onopen?.(),20)} addEventListener(){} close(){}};"%theme)
-                for view in ("overview", "agents"):
+                for view in ("overview", "agents", "costs"):
                     mobile.goto(f"http://127.0.0.1:{server.server_port}/{'' if view=='overview' else view}",wait_until="networkidle")
                     errors.extend(f"{view}-{theme}-mobile: {e}" for e in inspect(mobile,390))
                     if view=="agents":
@@ -271,6 +279,8 @@ def main():
                         errors.extend(f"{theme}: mobile {e}" for e in inspect_loop_flag(mobile))
                     if view == "overview":
                         mobile.screenshot(path=str(OUT/f"overview-{theme}-mobile.png"),full_page=True)
+                    if view == "costs" and mobile.evaluate("document.documentElement.scrollWidth>innerWidth+1"):
+                        errors.append(f"{theme}: forecast clipped at 390")
                     errors.extend(f"{view}-{theme}-mobile: {e}" for e in inspect_sticky_tabs(mobile))
                 mobile.close()
             browser.close()

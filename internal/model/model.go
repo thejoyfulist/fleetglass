@@ -256,15 +256,30 @@ type AIUsage struct {
 }
 
 type Quota struct {
-	Kind          string    `json:"kind"`
-	Window        string    `json:"window"`
-	WindowMinutes int64     `json:"window_minutes,omitempty"`
-	Used          float64   `json:"used_percent"`
-	ResetsAt      time.Time `json:"resets_at"`
-	Projected     time.Time `json:"projected_at,omitempty"`
-	Method        string    `json:"method"`
-	Source        string    `json:"source,omitempty"`
-	ObservedAt    time.Time `json:"observed_at"`
+	Kind          string         `json:"kind"`
+	Window        string         `json:"window"`
+	WindowMinutes int64          `json:"window_minutes,omitempty"`
+	Used          float64        `json:"used_percent"`
+	ResetsAt      time.Time      `json:"resets_at"`
+	Projected     time.Time      `json:"projected_at,omitempty"`
+	Method        string         `json:"method"`
+	Source        string         `json:"source,omitempty"`
+	ObservedAt    time.Time      `json:"observed_at"`
+	Forecast      *QuotaForecast `json:"forecast,omitempty"`
+}
+
+type QuotaForecast struct {
+	PacePPH        float64    `json:"pace_pph"`
+	EvenRatio      float64    `json:"even_ratio"`
+	PercentAtReset float64    `json:"percent_at_reset"`
+	RunsOutAt      time.Time  `json:"runs_out_at,omitzero"`
+	LockedHours    float64    `json:"locked_hours"`
+	Daily          []QuotaDay `json:"daily"`
+}
+type QuotaDay struct {
+	Day       string  `json:"day"`
+	UsedPP    float64 `json:"used_pp"`
+	AllowedPP float64 `json:"allowed_pp"`
 }
 
 type AI struct {
