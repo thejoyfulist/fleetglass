@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,6 +22,23 @@ import (
 
 func attr(k, v string) *common.KeyValue {
 	return &common.KeyValue{Key: k, Value: &common.AnyValue{Value: &common.AnyValue_StringValue{StringValue: v}}}
+}
+func TestStatuslineQuotaDedupe(t *testing.T) {
+	x := NewReceiver()
+	now := uint64(time.Now().UnixNano())
+	reset := fmt.Sprint(time.Now().Add(3 * time.Hour).Unix())
+	point := func(session string, used float64, at uint64) *metricspb.NumberDataPoint {
+		return &metricspb.NumberDataPoint{TimeUnixNano: at, Attributes: []*common.KeyValue{attr("session.id", session), attr("window", "5h"), attr("resets_at", reset)}, Value: &metricspb.NumberDataPoint_AsDouble{AsDouble: used}}
+	}
+	m := &metricspb.ResourceMetrics{ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{{Name: "claude_code.rate_limit.used_percentage", Data: &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{DataPoints: []*metricspb.NumberDataPoint{point("synthetic-one", 31, now-1), point("synthetic-two", 32, now)}}}}}}}}
+	sendOTLP(t, x.Handler(""), "/v1/metrics", "resourceMetrics", m, true, false)
+	q := x.Drain().Quotas
+	if len(q) != 1 || q[0].Used != 32 || q[0].Source != "statusline" || q[0].Method != "reported" {
+		t.Fatalf("quotas: %+v", q)
+	}
+	if len(x.Drain().Quotas) != 0 {
+		t.Fatal("quota repeated")
+	}
 }
 func sendOTLP(t *testing.T, h http.Handler, path, key string, v proto.Message, jsonMode, gzipMode bool) {
 	t.Helper()

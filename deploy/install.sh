@@ -33,7 +33,7 @@ if [ "$uninstall" -eq 1 ]; then
   for unit in fleetglass-agent fleetglass-server fleetglass-helper; do run systemctl disable --now "$unit.service"; done
   for unit in fleetglass-agent fleetglass-server fleetglass-helper; do run rm -f "$(path "/etc/systemd/system/$unit.service")"; done
   run rm -f "$(path /etc/systemd/system/fleetglass-agent.service.d/state.conf)" "$(path /etc/systemd/system/fleetglass-server.service.d/state.conf)"
-  for bin in agent server helper; do run rm -f "$(path "/usr/local/bin/fleetglass-$bin")"; done
+  for bin in agent server helper statusline; do run rm -f "$(path "/usr/local/bin/fleetglass-$bin")"; done
   run systemctl daemon-reload
   if [ "$dry" -eq 1 ]; then say 'DRY RUN: Fleetglass units and binaries would be removed; configuration, tokens, data, backups, account and ACLs would be preserved.'
   else say 'Fleetglass units and binaries removed. Configuration, tokens, data, backups, account and ACLs are preserved for explicit review.'; fi
@@ -42,8 +42,8 @@ fi
 self=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 bundle=$(CDPATH= cd -- "$self/.." && pwd)
 [ -f "$bundle/SHA256SUMS" ] || { echo 'Bundle SHA256SUMS missing' >&2; exit 1; }
-for bin in agent server helper; do [ -f "$bundle/fleetglass-$bin" ] || { echo "Missing fleetglass-$bin" >&2; exit 1; }; done
-if [ "$dry" -eq 1 ]; then say 'DRY RUN: verify SHA-256 checksums for all three binaries'; else (cd "$bundle" && sha256sum -c SHA256SUMS); fi
+for bin in agent server helper statusline; do [ -f "$bundle/fleetglass-$bin" ] || { echo "Missing fleetglass-$bin" >&2; exit 1; }; done
+if [ "$dry" -eq 1 ]; then say 'DRY RUN: verify SHA-256 checksums for all four binaries'; else (cd "$bundle" && sha256sum -c SHA256SUMS); fi
 say "Detected Linux $(uname -m) with systemd"
 if [ "$dry" -eq 1 ]; then
   say 'DRY RUN: create fleetglass system group and unprivileged user if absent'
@@ -53,7 +53,7 @@ else
 fi
 run install -d -m 0755 "$(path /etc/fleetglass)" "$(path /etc/systemd/system)" "$(path /usr/local/bin)"
 run install -d -o fleetglass -g fleetglass -m 0750 "$(path /var/lib/fleetglass)" "$(path /var/lib/fleetglass/buffer)"
-for bin in agent server helper; do run install -m 0755 "$bundle/fleetglass-$bin" "$(path "/usr/local/bin/fleetglass-$bin")"; done
+for bin in agent server helper statusline; do run install -m 0755 "$bundle/fleetglass-$bin" "$(path "/usr/local/bin/fleetglass-$bin")"; done
 for unit in agent server helper; do run install -m 0644 "$self/fleetglass-$unit.service" "$(path "/etc/systemd/system/fleetglass-$unit.service")"; done
 for unit in agent server; do
   drop="$(path "/etc/systemd/system/fleetglass-$unit.service.d")"

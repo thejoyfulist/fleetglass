@@ -19,13 +19,13 @@ for arch in amd64 arm64; do
   name="fleetglass-v$version-linux-$arch"
   stage="$out/$name"
   mkdir -p "$stage"
-  for bin in agent helper server; do
+  for bin in agent helper server statusline; do
     CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -buildvcs=false -ldflags "$ldflags" -o "$stage/fleetglass-$bin" "./cmd/fleetglass-$bin"
   done
   cp -R deploy docs assets "$stage/"
   cp LICENSE "$stage/"
   cp README.md "$stage/"
-  (cd "$stage" && sha256sum fleetglass-agent fleetglass-helper fleetglass-server > SHA256SUMS)
+  (cd "$stage" && sha256sum fleetglass-agent fleetglass-helper fleetglass-server fleetglass-statusline > SHA256SUMS)
   tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$epoch" -C "$out" -czf "$out/$name.tar.gz" "$name"
   rm -r "$stage"
 done

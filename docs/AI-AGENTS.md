@@ -27,7 +27,35 @@ exporter = { "otlp-http" = { endpoint = "http://127.0.0.1:4318/v1/logs", protoco
 metrics_exporter = { "otlp-http" = { endpoint = "http://127.0.0.1:4318/v1/metrics", protocol = "binary" } }
 ```
 
-For fallback, configure `ai_log_roots` and grant only those roots read/traverse ACLs; see [installer flags](INSTALL.md) and [`deploy/AI-ACCESS.md`](../deploy/AI-ACCESS.md). This path reads JSONL incrementally and does not follow symlinks. Root and other-user CLI sessions need their own OTLP settings or explicitly approved log ACLs. Set `project_roots` and `worktree_roots` to improve project and worktree attribution. Quotas are CLI-reported for Codex and estimated from configured budgets for Claude. Cost is labelled by method; it is never presented as an exact bill. The read-only MCP connection is documented separately in [MCP.md](MCP.md) and remains off by default.
+For fallback, configure `ai_log_roots` and grant only those roots read/traverse ACLs; see [installer flags](INSTALL.md) and [`deploy/AI-ACCESS.md`](../deploy/AI-ACCESS.md). This path reads JSONL incrementally and does not follow symlinks. Root and other-user CLI sessions need their own OTLP settings or explicitly approved log ACLs. Set `project_roots` and `worktree_roots` to improve project and worktree attribution. Codex quotas are CLI-reported. Claude quotas are reported by the status line when available, with configured-budget estimates as fallback. Cost is labelled by method; it is never presented as an exact bill. The read-only MCP connection is documented separately in [MCP.md](MCP.md) and remains off by default.
+
+## Claude plan limits
+
+The optional `fleetglass-statusline` binary reads Claude Code's documented [status-line JSON](https://code.claude.com/docs/en/statusline#available-data) from stdin. It extracts only the 5-hour, 7-day and optional spend-limit percentages and reset times, a hash of the session ID, and the Claude Code version. It sends OTLP/HTTP JSON to the local receiver. Install the release bundle first, then merge this into your user-level Claude Code `settings.json` yourself:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "fleetglass-statusline"
+  }
+}
+```
+
+If another command already owns the status line, keep its output and exit status by chaining it after `--`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "fleetglass-statusline -- my-existing-status-command"
+  }
+}
+```
+
+The wrapped command receives the same stdin bytes and its stdout is passed through unchanged. Without a wrapped command, Fleetglass prints a short percentage summary. `--endpoint http://127.0.0.1:PORT` or `FLEETGLASS_STATUSLINE_ENDPOINT` changes the local OTLP/HTTP endpoint; only loopback addresses are accepted. Delivery has a 250 ms timeout and errors are ignored so an unavailable receiver does not hold up the status line. The installer never edits user settings.
+
+Claude Code documents the 5-hour and 7-day fields for **claude.ai Pro and Max subscribers only**. The optional spend-limit fields apply behind a Claude apps gateway with spend limits and require Claude Code v2.1.251 or later; the percentage may exceed 100%. All fields appear only after the first API response in a session, and each window can be absent. The status line runs locally without consuming tokens and updates on events (debounced by 300 ms), while Claude Code is open. An optional `refreshInterval` in `statusLine` can request periodic updates. See the [rate-limit fields and update behavior](https://code.claude.com/docs/en/statusline#spend-limit-fields). Fleetglass deliberately does not call the undocumented Claude OAuth usage endpoint or read Claude credentials: that route requires user OAuth credentials, impersonates the Claude Code client, is aggressively rate limited, and conflicts with the least-privilege approach and Anthropic's restrictions on third-party handling of Claude.ai credentials.
 
 ## Where each number comes from
 

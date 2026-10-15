@@ -274,7 +274,18 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/hosts/{id}/ai/quotas", func(w http.ResponseWriter, r *http.Request) {
 		v, e := a.Store.Quotas(r.PathValue("id"))
 		if e == nil {
-			v = append(v, a.Store.ClaudeEstimates(r.PathValue("id"), a.ClaudeBudget5H, a.ClaudeBudgetWeek)...)
+			for _, estimate := range a.Store.ClaudeEstimates(r.PathValue("id"), a.ClaudeBudget5H, a.ClaudeBudgetWeek) {
+				reported := false
+				for _, q := range v {
+					if q.Kind == estimate.Kind && q.Window == estimate.Window && q.Method == "reported" && q.ResetsAt.After(time.Now()) {
+						reported = true
+						break
+					}
+				}
+				if !reported {
+					v = append(v, estimate)
+				}
+			}
 		}
 		if e != nil {
 			http.Error(w, "storage error", 500)

@@ -263,6 +263,7 @@ type Quota struct {
 	ResetsAt      time.Time `json:"resets_at"`
 	Projected     time.Time `json:"projected_at,omitempty"`
 	Method        string    `json:"method"`
+	Source        string    `json:"source,omitempty"`
 	ObservedAt    time.Time `json:"observed_at"`
 }
 

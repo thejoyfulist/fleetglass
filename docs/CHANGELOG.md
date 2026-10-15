@@ -14,6 +14,8 @@ All notable user-facing changes are documented here. This project follows [Keep 
 
 ### Added
 
+- Optional Claude Code status-line bridge for reported plan limits, with safe chaining of an existing status command and local OTLP delivery.
+
 - Per-session last file edit and last tool timestamps, a configurable possible-loop warning, and an edit-age column in the cockpit and read-only MCP output.
 
 - Per-metric provenance for agent sessions: the session view shows the feed beside each value (`otel` OpenTelemetry, `log` local logs, `proc` process attribution, `est.` estimated), and tables tag each session `otel`, `log`, `otel+log` or `proc`.

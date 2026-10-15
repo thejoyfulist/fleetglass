@@ -11,6 +11,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -33,7 +34,7 @@ func attributes(items []*common.KeyValue) map[string]string {
 			continue
 		}
 		switch item.Key {
-		case "session.id", "session_id", "conversation.id", "model", "model_name", "type", "event.name", "event.kind", "event", "tool_name", "tool.name", "status", "status_code", "error.type", "kind", "duration_ms", "request_duration_ms", "time_to_first_token_ms", "ttft_ms", "output_tokens_per_second", "output_tokens_per_sec", "input_token_count", "output_token_count", "cached_token_count", "cache_write_token_count", "reasoning_token_count", "input_tokens", "output_tokens", "cache_read_tokens", "cache_creation_tokens":
+		case "session.id", "session_id", "conversation.id", "window", "resets_at", "model", "model_name", "type", "event.name", "event.kind", "event", "tool_name", "tool.name", "status", "status_code", "error.type", "kind", "duration_ms", "request_duration_ms", "time_to_first_token_ms", "ttft_ms", "output_tokens_per_second", "output_tokens_per_sec", "input_token_count", "output_token_count", "cached_token_count", "cache_write_token_count", "reasoning_token_count", "input_tokens", "output_tokens", "cache_read_tokens", "cache_creation_tokens":
 			v := item.Value.GetStringValue()
 			if v == "" {
 				switch item.Value.GetValue().(type) {
@@ -120,10 +121,11 @@ type Receiver struct {
 	turnTTFT    map[string]float64
 	metricUsage map[string]string
 	claudeLogs  map[string]bool
+	quotas      map[string]model.Quota
 }
 
 func NewReceiver() *Receiver {
-	return &Receiver{usage: map[string]model.AIUsage{}, sessions: map[string]model.AgentSession{}, cumulative: map[string]float64{}, errors: map[string]int{}, turnStart: map[string]time.Time{}, firstToken: map[string]time.Time{}, turnTTFT: map[string]float64{}, metricUsage: map[string]string{}, claudeLogs: map[string]bool{}}
+	return &Receiver{usage: map[string]model.AIUsage{}, sessions: map[string]model.AgentSession{}, cumulative: map[string]float64{}, errors: map[string]int{}, turnStart: map[string]time.Time{}, firstToken: map[string]time.Time{}, turnTTFT: map[string]float64{}, metricUsage: map[string]string{}, claudeLogs: map[string]bool{}, quotas: map[string]model.Quota{}}
 }
 func (x *Receiver) Drain() model.AI {
 	x.mu.Lock()
@@ -144,6 +146,10 @@ func (x *Receiver) Drain() model.AI {
 	for _, u := range x.usage {
 		out.Usage = append(out.Usage, u)
 	}
+	for _, q := range x.quotas {
+		out.Quotas = append(out.Quotas, q)
+	}
+	x.quotas = map[string]model.Quota{}
 	x.usage = map[string]model.AIUsage{}
 	x.metricUsage = map[string]string{}
 	if len(x.cumulative) > 10000 {
@@ -282,6 +288,43 @@ func (x *Receiver) metrics(resources []*metricspb.ResourceMetrics) {
 	for _, rm := range resources {
 		for _, sm := range rm.GetScopeMetrics() {
 			for _, m := range sm.GetMetrics() {
+				if m.GetName() == "claude_code.rate_limit.used_percentage" {
+					for _, p := range m.GetGauge().GetDataPoints() {
+						a := attributes(p.GetAttributes())
+						window := a["window"]
+						minutes := int64(0)
+						switch window {
+						case "5h":
+							minutes = 300
+						case "7d":
+							minutes = 10080
+						case "spend":
+							minutes = 0
+						default:
+							continue
+						}
+						reset, e := strconv.ParseInt(a["resets_at"], 10, 64)
+						if e != nil || reset <= 0 {
+							continue
+						}
+						at := validTime(p.GetTimeUnixNano())
+						if at.IsZero() {
+							continue
+						}
+						used := p.GetAsDouble()
+						if _, ok := p.GetValue().(*metricspb.NumberDataPoint_AsInt); ok {
+							used = float64(p.GetAsInt())
+						}
+						if math.IsNaN(used) || math.IsInf(used, 0) || used < 0 || (window != "spend" && used > 100) {
+							continue
+						}
+						q := model.Quota{Kind: "claude", Window: window, WindowMinutes: minutes, Used: used, ResetsAt: time.Unix(reset, 0).UTC(), ObservedAt: at, Method: "reported", Source: "statusline"}
+						if old, ok := x.quotas[window]; !ok || at.After(old.ObservedAt) {
+							x.quotas[window] = q
+						}
+					}
+					continue
+				}
 				k := kind(m.GetName())
 				if k == "" {
 					continue

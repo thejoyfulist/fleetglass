@@ -18,7 +18,7 @@
 
 ## Why Fleetglass
 
-- See which agent session and project is using CPU and memory, alongside token pace, model cost estimates, and subscription quotas.
+- See which agent session and project is using CPU and memory, alongside token pace, model cost estimates, and subscription quotas, including optional Claude Code status-line limits.
 - Spot active sessions with no observed file change for the configured interval; a cyan "loop?" flag suggests review.
 - Know where every number comes from: each session metric is tagged OpenTelemetry, local logs, process or estimated.
 - Check machine health, services, containers, projects, probes, and recent changes on one screen.
@@ -88,6 +88,8 @@ metrics_exporter = { "otlp-http" = { endpoint = "http://127.0.0.1:4318/v1/metric
 ```
 
 See [agent setup](docs/AI-AGENTS.md) for attribution, local log fallback, and quota limits.
+
+**FAQ: Can Fleetglass show Claude plan limits?** Yes. Add the optional `fleetglass-statusline` command to Claude Code's `statusLine` setting. Reported 5-hour and 7-day values take precedence over budget estimates when available. It reads only Claude Code's documented status-line input and does not access Claude OAuth credentials. See [Claude plan limits](docs/AI-AGENTS.md#claude-plan-limits).
 
 ## Features
 

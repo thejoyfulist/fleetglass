@@ -52,6 +52,7 @@ assert c['smart_devices']==['/dev/nvme0n1','/dev/sda']
 assert c['systemd_units']==['docker.service','example-failed.service','ssh.service']
 PY
 [ -f "$tmp/root/etc/systemd/system/fleetglass-server.service.d/state.conf" ]
+[ -x "$tmp/root/usr/local/bin/fleetglass-statusline" ]
 sh "$bundle/deploy/install.sh" --dry-run > "$tmp/dry-existing.txt"
 grep -q 'Preserve existing ingest token' "$tmp/dry-existing.txt"
 sh "$bundle/deploy/install.sh" --upgrade --dry-run > "$tmp/dry-upgrade.txt"
@@ -70,6 +71,7 @@ grep -q 'FAILED' "$tmp/tamper.txt"
 mv "$tmp/original-agent" "$bundle/fleetglass-agent"
 sh "$bundle/deploy/install.sh" --uninstall > "$tmp/uninstall.txt"
 [ ! -e "$tmp/root/usr/local/bin/fleetglass-server" ]
+[ ! -e "$tmp/root/usr/local/bin/fleetglass-statusline" ]
 [ -f "$tmp/root/etc/fleetglass/config.json" ]
 [ -f "$tmp/root/etc/fleetglass/token" ]
 printf 'Installer fixture checks passed\n'
