@@ -17,6 +17,8 @@ All notable user-facing changes are documented here. This project follows [Keep 
 
 ### Added
 
+- README architecture diagram in light and dark themes, with an interactive, source-linked version in `docs/architecture/`.
+
 - Quota pace forecasts from recent history, a text timeline and daily allowance bars in Costs, plus a runout headline in the overview.
 
 - Optional Claude Code status-line bridge for reported plan limits, with safe chaining of an existing status command and local OTLP delivery.

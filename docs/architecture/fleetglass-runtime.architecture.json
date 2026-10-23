@@ -1,0 +1,315 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Fleetglass runtime overview",
+    "locale": "en",
+    "output": "docs/architecture/fleetglass-runtime.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/thejoyfulist/fleetglass.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "14cc569eec5714247e003a2f5c735bdbbe97e0e1"
+    }
+  },
+  "components": [
+    {
+      "id": "coding-agents",
+      "type": "external",
+      "label": "Claude Code / Codex",
+      "sublabel": "OTLP exporters",
+      "pos": [
+        40,
+        200
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "session-logs",
+      "type": "database",
+      "label": "Local session logs",
+      "sublabel": "ai_log_roots (opt-in)",
+      "pos": [
+        330,
+        40
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "cmd/fleetglass-agent/main.go",
+          "line": 445,
+          "end_line": 452,
+          "label": "log reader setup"
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "fleetglass-agent",
+      "sublabel": "unprivileged collector",
+      "tag": "15 s / 5 min",
+      "pos": [
+        330,
+        200
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "cmd/fleetglass-agent/main.go",
+          "line": 453,
+          "end_line": 476,
+          "label": "OTLP listener + collect loop"
+        },
+        {
+          "path": "cmd/fleetglass-agent/main.go",
+          "line": 274,
+          "end_line": 305,
+          "label": "drain, scan logs, enrich"
+        },
+        {
+          "path": "cmd/fleetglass-agent/buffer.go",
+          "line": 17,
+          "end_line": 67,
+          "label": "buffer + POST ingest"
+        }
+      ]
+    },
+    {
+      "id": "helper",
+      "type": "security",
+      "label": "fleetglass-helper",
+      "sublabel": "root, fixed GET reads",
+      "tag": "unix socket 0660",
+      "pos": [
+        330,
+        370
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "cmd/fleetglass-helper/main.go",
+          "line": 35,
+          "end_line": 63,
+          "label": "socket server"
+        },
+        {
+          "path": "internal/helper/helper.go",
+          "line": 121,
+          "end_line": 176,
+          "label": "GET-only allowlist"
+        }
+      ]
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "fleetglass-server",
+      "sublabel": "HTTP API :7878",
+      "pos": [
+        660,
+        200
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "cmd/fleetglass-server/main.go",
+          "line": 46,
+          "end_line": 131,
+          "label": "store, maintenance, listeners"
+        },
+        {
+          "path": "internal/api/api.go",
+          "line": 530,
+          "end_line": 576,
+          "label": "ingest + live fan-out"
+        }
+      ]
+    },
+    {
+      "id": "sqlite",
+      "type": "database",
+      "label": "SQLite store",
+      "sublabel": "samples, rollups, hosts",
+      "pos": [
+        660,
+        370
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "internal/store/store.go",
+          "line": 18,
+          "end_line": 24,
+          "label": "open sqlite"
+        },
+        {
+          "path": "internal/store/store.go",
+          "line": 108,
+          "end_line": 112,
+          "label": "Ingest batch"
+        }
+      ]
+    },
+    {
+      "id": "mcp-clients",
+      "type": "external",
+      "label": "MCP clients",
+      "sublabel": "read-only, token",
+      "pos": [
+        660,
+        40
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "internal/api/mcp.go",
+          "line": 14,
+          "end_line": 40,
+          "label": "MCP handler"
+        }
+      ]
+    },
+    {
+      "id": "cockpit",
+      "type": "frontend",
+      "label": "Cockpit",
+      "sublabel": "React, embedded in server",
+      "pos": [
+        990,
+        200
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "web/embed.go",
+          "line": 12,
+          "end_line": 30,
+          "label": "embedded dist"
+        },
+        {
+          "path": "internal/api/api.go",
+          "line": 360,
+          "end_line": 361,
+          "label": "live + web routes"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Monitored host",
+      "wraps": [
+        "coding-agents",
+        "session-logs",
+        "agent",
+        "helper"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "otlp",
+      "from": "coding-agents",
+      "to": "agent",
+      "label": "OTLP/HTTP :4318",
+      "variant": "emphasis"
+    },
+    {
+      "id": "log-scan",
+      "from": "agent",
+      "to": "session-logs",
+      "label": "scan",
+      "variant": "dashed"
+    },
+    {
+      "id": "privileged-reads",
+      "from": "agent",
+      "to": "helper",
+      "label": "GET via socket",
+      "variant": "security"
+    },
+    {
+      "id": "ingest",
+      "from": "agent",
+      "to": "server",
+      "label": "POST /api/v1/ingest",
+      "variant": "emphasis"
+    },
+    {
+      "id": "persist",
+      "from": "server",
+      "to": "sqlite",
+      "label": "write + rollup"
+    },
+    {
+      "id": "mcp",
+      "from": "mcp-clients",
+      "to": "server",
+      "label": "MCP (opt-in)",
+      "variant": "dashed"
+    },
+    {
+      "id": "live",
+      "from": "server",
+      "to": "cockpit",
+      "label": "REST + SSE live",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Collection",
+      "items": [
+        "Agent receives OTLP metrics and logs on loopback",
+        "Optional fleetglass-statusline forwards Claude plan limits to the same port",
+        "Batches are buffered to disk before POST when buffer_dir is set"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Privilege split",
+      "items": [
+        "Only the helper runs as root",
+        "It answers fixed GET paths (SMART, RAPL, Docker, agents, backups)",
+        "Socket is group-readable, mode 0660"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Serving",
+      "items": [
+        "Ingest needs a per-host bearer token",
+        "Each accepted batch pushes a fresh overview to SSE subscribers",
+        "Hourly maintenance and optional daily backups"
+      ]
+    }
+  ]
+}

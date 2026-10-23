@@ -132,6 +132,12 @@ bearer_token_env_var = "FLEETGLASS_MCP_TOKEN"
 
 Load `FLEETGLASS_MCP_TOKEN` into the CLI's environment from its private token file. The four tools are `what_is_running`, `figure_attribution`, `what_is_on_port`, and `host_status`.
 
+## How it works
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/architecture/architecture-dark.svg"><img src="docs/architecture/architecture-light.svg" alt="Fleetglass runtime: coding agents send OTLP to the unprivileged fleetglass-agent, which reads opt-in session logs and asks the root helper for fixed reads over a unix socket, then posts batches to fleetglass-server; the server stores them in SQLite and serves the cockpit over REST and SSE, with optional read-only MCP."></picture>
+
+Coding agents send OpenTelemetry to the unprivileged `fleetglass-agent`, which also scans opt-in session logs and asks the root helper for a fixed set of reads over a local socket. The agent posts batches to `fleetglass-server`, which writes them to SQLite and pushes live updates to the cockpit; MCP clients get read-only access when enabled. An [interactive version](docs/architecture/fleetglass-runtime.html) links every box to its source (download it and open it in a browser).
+
 ## Privacy & security
 
 - No product telemetry is sent to the maintainers. The optional release check is off by default.
