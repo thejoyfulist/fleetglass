@@ -14,3 +14,4 @@ Read `docs/PRODUCT.md` first: it is the source of truth for scope and principles
 - Documentation ships with the change, in the same commit: every user-visible change adds an entry under `## [Unreleased]` in
   `docs/CHANGELOG.md`, updates `README.md` when features, install steps, configuration or screenshots change, and
   updates the matching page in `docs/`. New config keys go in `docs/CONFIGURATION.md`. Screenshots use synthetic data only.
+- When reviewing a branch, also apply `docs/code_review.md`, the review checklist built from past findings on this repo.
