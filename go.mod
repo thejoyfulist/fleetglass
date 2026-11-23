@@ -4,7 +4,7 @@ go 1.26.9
 
 require (
 	go.opentelemetry.io/proto/otlp v1.9.0
-	google.golang.org/protobuf v1.36.10
+	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.39.1
 )
 
